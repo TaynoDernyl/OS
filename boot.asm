@@ -52,7 +52,7 @@ input:
 	.done:
 	mov ah, 0x0e
 	int 0x10
-	jmp start
+	jmp buffer
 
 times 510-($-$$) db 0x00
 dw 0AA55h
