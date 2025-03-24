@@ -4,6 +4,11 @@
 
 msgH:
 	db "Hello, this is IvOS", 0x0A, 0x0D, "Enter the password:", 0x00 ; приветственное сообщение
+
+done:
+	jmp $
+buffer:
+	times 10 db 0
 putchar:
 	mov ah, 0x0E
 	mov bh, 0
@@ -19,9 +24,6 @@ puts:
 	jmp .loop
 	.done:
 	jmp input
-	
-buffer:
-	times 10 db 0
 start:
 	mov si, buffer
 	xor ax, ax
@@ -52,7 +54,7 @@ input:
 	.done:
 	mov ah, 0x0e
 	int 0x10
-	jmp buffer
+	jmp start
 
 times 510-($-$$) db 0x00
 dw 0AA55h
