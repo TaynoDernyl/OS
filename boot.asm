@@ -3,7 +3,7 @@
 	jmp start
 
 msgH:
-	db "Hello, this is IvOS", 0x0A, 0x0D, "Enter the password:", 0x00 ; приветственное сообщение
+	db "Hello, this is LetovOS", 0x0A, 0x0D, "Enter the password:", 0x00 ; приветственное сообщение
 passwd:
 	db "123", 0x0D, 0, 0, 0, 0, 0, 0
 done:
