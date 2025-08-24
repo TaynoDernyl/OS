@@ -1,10 +1,22 @@
 import struct
 binaryd = open("code.bin", "wb+")
 #===================================
+def parse_number(s):
+    # если есть префикс 0x → переводим как hex
+    if s.startswith("0x") or s.startswith("0X"):
+        return int(s, 16)
+    return int(s)  # иначе decimal
+
+#===================================
 def switch(incode, operrand):
     if incode == "q":
+        binaryd.seek(0, 2)
         number = struct.pack("<B", 0xFF)
         binaryd.write(number)
+    elif incode == "f":
+        number = struct.pack("<B", 0xFF)
+        binaryd.write(number)
+        start()
     elif incode == "":
         start()
     elif incode == "b":
@@ -15,9 +27,28 @@ def switch(incode, operrand):
     elif incode == "r":
         binaryd.seek(0)
         stroke = binaryd.read()
-        print(stroke)
+        for b in stroke:
+            print(hex(b), end=" ")  
+        print()     
         binaryd.seek(0, 2)
-        stroke = binaryd.read()
+        start()
+    elif incode == "jmp":
+        number = struct.pack("<B", 0x0B)
+        binaryd.write(number)
+        number = struct.pack("<H", operrand)
+        binaryd.write(number)
+        start()
+    elif incode == "jz":
+        number = struct.pack("<B", 0x0C)
+        binaryd.write(number)
+        number = struct.pack("<H", operrand)
+        binaryd.write(number)
+        start()
+    elif incode == "jnz":
+        number = struct.pack("<B", 0x0D)
+        binaryd.write(number)
+        number = struct.pack("<H", operrand)
+        binaryd.write(number)
         start()
     elif incode == "lda":
         number = struct.pack("<B", 0x01)
@@ -83,7 +114,7 @@ def start():
     parts = ans.split()
     command = parts[0]
     try:
-        opperand = int(parts[1])
+        opperand = parse_number(parts[1])
         switch(command, opperand)
     except:
         switch(command, 0)
