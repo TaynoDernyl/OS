@@ -1,6 +1,16 @@
 import struct
-binaryd = open("code.bin", "wb+")
+binaryd = open("temp.bin", "wb+")
 #===================================
+def save_out():
+    try:
+        temp = open("temp.bin", "wb+")
+        code = open("code.bin", "rb")
+        data = code.read()
+        temp.write(data)
+        code.close()
+        return 0
+    except:
+        return 1    
 def parse_number(s):
     # если есть префикс 0x → переводим как hex
     if s.startswith("0x") or s.startswith("0X"):
@@ -17,6 +27,45 @@ def switch(incode, operrand):
         number = struct.pack("<B", 0xFF)
         binaryd.write(number)
         start()
+    elif incode == "cc":
+        try:
+            code = open("code.bin", "wb+")
+            print("файл создан")
+            code.close
+            start()
+        except:
+            print("неизвестная ошибка")
+            start()    
+    elif incode == "si":
+        if input("вы уверены?y/n:") == "y":
+            try:
+                binaryd.seek(0)
+                binsave = open("code.bin", "wb+")
+                binsave.write(binaryd.read())
+                binsave.close()
+                binaryd.seek(0, 2)
+                print("Успешно!")
+                start()
+            except:
+                print("ошибка")
+                start()
+        else:
+            print("изменения не сохранены")
+            start()    
+    elif incode == "so":
+        if input("вы уверены?y/n:") == "y":
+            result = save_out()
+            if result == 1:
+                print("ошибка при записи файла, убедитесь что есть файл code.bin")
+                start()
+            elif result == 0:
+                print("Успешно!")
+                start()
+            else:
+                print("неизвестная ошибка?")
+        else:
+            print("изменения не сохранены")
+            start() 
     elif incode == "":
         start()
     elif incode == "b":
@@ -115,8 +164,9 @@ def start():
     command = parts[0]
     try:
         opperand = parse_number(parts[1])
-        switch(command, opperand)
-    except:
-        switch(command, 0)
+    except IndexError:
+        opperand = 0
+
+    switch(command, opperand)
 #===================================        
 start()    
