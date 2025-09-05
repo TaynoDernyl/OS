@@ -23,6 +23,8 @@
 #define HLT 0xFF //халт
 #define LDAL(x) 0xA1, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
 #define LDAH(x) 0xA2, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
+#define LDBL(x) 0xB1, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
+#define LDBH(x) 0xB2, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
 
 typedef struct 
 {
@@ -67,13 +69,13 @@ int main(int argc, char **argv) {
 
     if (prog) load_binary(prog); else load_demo_program();
 
-    CPU cpu = { .A = 0, .B = 0, .PC = 0, .Z = 0, .AL = 0, .AH = 0};
+    CPU cpu = { .A = 0, .B = 0, .PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0, .BH = 0};
 
     for (;;) {
         uint8_t op = mem[cpu.PC++];
         if (trace) {
-            printf("PC=%04X OP=%02X  A=%02X B=%02X Z=%d AL=%04X AH=%04X\n",
-                   (cpu.PC-1) & 0xFFFF, op, cpu.A, cpu.B, cpu.Z, cpu.AL, cpu.AH);
+            printf("PC=%04X OP=%02X  A=%02X B=%02X Z=%d AL=%04X AH=%04X BL=%04X BH=%04X\n",
+                   (cpu.PC-1) & 0xFFFF, op, cpu.A, cpu.B, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH);
         }
         switch (op) {
             case 0xA1: { // LDAL #imm16 (загрузить 16-битное число в AL)
@@ -88,6 +90,18 @@ int main(int argc, char **argv) {
             cpu.AH = val;
             setZ(&cpu, (uint8_t)cpu.AH);
                 } break;
+            case 0xB1: { // LDAL #imm16 (загрузить 16-битное число в BL)
+            uint16_t val = rd16(cpu.PC); // читаем 16 бит из памяти
+            cpu.PC += 2;                 // сдвигаем PC на 2 байта
+            cpu.BL = val;                // сохраняем в регистр AL
+            setZ(&cpu, (uint8_t)cpu.BL); // выставляем флаг Z по младшему байту (можно и по всему BL)
+                } break;    
+            case 0xB2: {
+            uint16_t val =rd16(cpu.PC);
+            cpu.PC += 2;
+            cpu.BH = val;
+            setZ(&cpu, (uint8_t)cpu.BH);
+                } break;    
             case 0x00: /* NOP */ break;
 
             case 0x01: // LDA #imm

@@ -154,7 +154,31 @@ def switch(incode, operrand):
         binaryd.write(number)
         number = struct.pack("<H", operrand)
         binaryd.write(number)
+        start()  
+    elif incode == "ldal":
+        number = struct.pack("<B", 0xA1)
+        binaryd.write(number)
+        number = struct.pack("<H", operrand)
+        binaryd.write(number)
+        start()
+    elif incode == "ldah":
+        number = struct.pack("<B", 0xA2)
+        binaryd.write(number)
+        number = struct.pack("<H", operrand)
+        binaryd.write(number)
         start()    
+    elif incode == "ldbl":
+        number = struct.pack("<B", 0xB1)
+        binaryd.write(number)
+        number = struct.pack("<H", operrand)
+        binaryd.write(number)
+        start() 
+    elif incode == "ldbh":
+        number = struct.pack("<B", 0xB2)
+        binaryd.write(number)
+        number = struct.pack("<H", operrand)
+        binaryd.write(number)
+        start()     
     else:
         start()        
 #===================================        
