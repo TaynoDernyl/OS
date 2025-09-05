@@ -17,13 +17,16 @@
 #define INC 0x09 //inc A
 #define DEC 0x0A // dec A
 #define JMP(addr) 0x0B, (uint8_t)((addr) & 0xFF), (uint8_t)(((addr) >> 8) & 0xFF) //JMP 16 бит
-#define JZ(addr) 0x0C, (uint16_t)((addr) & 0xFF),  (uint16_t)(((addr) >> 8) & 0xFF) //JZ 16 бит
+#define JZ(addr) 0x0C, (uint8_t)((addr) & 0xFF),  (uint8_t)(((addr) >> 8) & 0xFF) //JZ 16 бит
 #define JNZ(addr) 0x0D, (uint8_t)((addr) & 0xFF),  (uint8_t)(((addr) >> 8) & 0xFF) //JNZ 16 бит
 #define PRINTA 0x0E //выводим А
 #define HLT 0xFF //халт
+#define LDAL(x) 0xA1, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
+#define LDAH(x) 0xA2, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
 
 typedef struct 
 {
+    uint16_t AL, AH, BL, BH;
     uint8_t A, B;
     uint16_t PC;
     uint8_t Z;
@@ -48,7 +51,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {LOAD_A(9),PRINTA,DEC,JNZ(0x0002), 0xFF};
+    uint8_t demo[] = {LDAL(9),LDAH(140), 0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -64,15 +67,27 @@ int main(int argc, char **argv) {
 
     if (prog) load_binary(prog); else load_demo_program();
 
-    CPU cpu = { .A = 0, .B = 0, .PC = 0, .Z = 0 };
+    CPU cpu = { .A = 0, .B = 0, .PC = 0, .Z = 0, .AL = 0, .AH = 0};
 
     for (;;) {
         uint8_t op = mem[cpu.PC++];
         if (trace) {
-            printf("PC=%04X OP=%02X  A=%02X B=%02X Z=%d\n",
-                   (cpu.PC-1) & 0xFFFF, op, cpu.A, cpu.B, cpu.Z);
+            printf("PC=%04X OP=%02X  A=%02X B=%02X Z=%d AL=%04X AH=%04X\n",
+                   (cpu.PC-1) & 0xFFFF, op, cpu.A, cpu.B, cpu.Z, cpu.AL, cpu.AH);
         }
         switch (op) {
+            case 0xA1: { // LDAL #imm16 (загрузить 16-битное число в AL)
+            uint16_t val = rd16(cpu.PC); // читаем 16 бит из памяти
+            cpu.PC += 2;                 // сдвигаем PC на 2 байта
+            cpu.AL = val;                // сохраняем в регистр AL
+            setZ(&cpu, (uint8_t)cpu.AL); // выставляем флаг Z по младшему байту (можно и по всему AL)
+                } break;
+            case 0xA2: {
+            uint16_t val =rd16(cpu.PC);
+            cpu.PC += 2;
+            cpu.AH = val;
+            setZ(&cpu, (uint8_t)cpu.AH);
+                } break;
             case 0x00: /* NOP */ break;
 
             case 0x01: // LDA #imm
