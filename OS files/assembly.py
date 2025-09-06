@@ -1,4 +1,6 @@
 import struct
+import keyboard
+
 binaryd = open("temp.bin", "wb+")
 #===================================
 def save_out():
@@ -11,6 +13,16 @@ def save_out():
         return 0
     except:
         return 1    
+#===================================
+def read():
+    temp = keyboard.read_key()
+    binaryd.seek(0)
+    stroke = binaryd.read()
+    for b in stroke:
+        print(hex(b), end=" ")  
+    print()
+    return 0
+#===================================    
 def parse_number(s):
     # если есть префикс 0x → переводим как hex
     if s.startswith("0x") or s.startswith("0X"):
@@ -69,17 +81,12 @@ def switch(incode, operrand):
     elif incode == "":
         start()
     elif incode == "b":
-        binaryd.seek(0, 2)
         size = binaryd.tell()
         binaryd.truncate(size -1)
+        binaryd.seek(0, 2)
         start() 
     elif incode == "r":
-        binaryd.seek(0)
-        stroke = binaryd.read()
-        for b in stroke:
-            print(hex(b), end=" ")  
-        print()     
-        binaryd.seek(0, 2)
+        read()
         start()
     elif incode == "jmp":
         number = struct.pack("<B", 0x0B)
@@ -131,6 +138,10 @@ def switch(incode, operrand):
         number = struct.pack("<B", 0x0E)
         binaryd.write(number)    
         start()
+    elif incode == "printl":
+        number = struct.pack("<B", 0xAE)
+        binaryd.write(number)    
+        start()   
     elif incode == "ldma":
         number = struct.pack("<B", 0x03)
         binaryd.write(number)
