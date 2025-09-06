@@ -20,6 +20,7 @@
 #define JZ(addr) 0x0C, (uint8_t)((addr) & 0xFF),  (uint8_t)(((addr) >> 8) & 0xFF) //JZ 16 бит
 #define JNZ(addr) 0x0D, (uint8_t)((addr) & 0xFF),  (uint8_t)(((addr) >> 8) & 0xFF) //JNZ 16 бит
 #define PRINTA 0x0E //выводим А
+#define PRINTAL 0xAE //выводим АL
 #define HLT 0xFF //халт
 #define LDAL(x) 0xA1, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
 #define LDAH(x) 0xA2, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
@@ -53,7 +54,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {LDAL(9),LDAH(140), 0xFF};
+    uint8_t demo[] = {LOAD_A(0x42),PRINTA,LDAL(88),PRINTAL, 0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -74,7 +75,7 @@ int main(int argc, char **argv) {
     for (;;) {
         uint8_t op = mem[cpu.PC++];
         if (trace) {
-            printf("PC=%04X OP=%02X  A=%02X B=%02X Z=%d AL=%04X AH=%04X BL=%04X BH=%04X\n",
+            printf("\n PC=%04X OP=%02X  A=%02X B=%02X Z=%d AL=%04X AH=%04X BL=%04X BH=%04X\n",
                    (cpu.PC-1) & 0xFFFF, op, cpu.A, cpu.B, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH);
         }
         switch (op) {
@@ -171,7 +172,15 @@ int main(int argc, char **argv) {
             } break;
 
             case 0x0E: // OUTA
-                printf("%u\n", (unsigned)cpu.A);
+                if (cpu.A >= 32){
+                    printf("%c", (unsigned)cpu.A);
+                }
+                else{
+                    printf("%u", (unsigned)cpu.A);
+                }
+            break;
+            case 0xAE: //OUTAL
+                printf("%u", (unsigned)cpu.AL);
                 break;
 
             case 0xFF: // HALT
