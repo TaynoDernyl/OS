@@ -2,6 +2,16 @@ import struct
 import keyboard
 
 binaryd = open("temp.bin", "wb+")
+registers = {
+    "A": 0,
+    "B": 0,
+    "AL": 0,
+    "AH": 0,
+    "BL": 0,
+    "BH": 0,
+    "AX": 0,
+    "BX": 0
+}
 #===================================
 def save_out():
     try:
@@ -24,11 +34,16 @@ def read():
     return 0
 #===================================    
 def parse_number(s):
-    # если есть префикс 0x → переводим как hex
-    if s.startswith("0x") or s.startswith("0X"):
-        return int(s, 16)
-    return int(s)  # иначе decimal
-
+    if s is None:
+        return 0
+    try:
+        # если есть префикс 0x → переводим как hex
+        if s.startswith("0x") or s.startswith("0X"):
+            return int(s, 16)
+        else:
+            return int(s)  # иначе decimal
+    except ValueError:
+        return s
 #===================================
 def switch(incode, operrand):
     if incode == "q":
@@ -109,8 +124,17 @@ def switch(incode, operrand):
     elif incode == "lda":
         number = struct.pack("<B", 0x01)
         binaryd.write(number)
-        number = struct.pack("<B", operrand)
-        binaryd.write(number)
+        if isinstance(operrand, int):
+            registers["A"] = operrand
+            number = struct.pack("<B", operrand)
+            binaryd.write(number)
+        elif isinstance(operrand, str):
+            if operrand.upper() in registers:
+                operrand = registers[operrand.upper()]
+                number = struct.pack("<B", operrand)
+                binaryd.write(number)
+            else:
+                print("неизвестный регистр")    
         start()
     elif incode == "ldb":
         number = struct.pack("<B", 0x02)
@@ -197,11 +221,12 @@ def start():
     ans = input(":")
     parts = ans.split()
     command = parts[0]
+
     try:
         opperand = parse_number(parts[1])
     except IndexError:
         opperand = 0
 
-    switch(command, opperand)
+    switch(command, opperand)    
 #===================================        
 start()    
