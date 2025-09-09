@@ -19,18 +19,19 @@
 #define JMP(addr) 0x0B, (uint8_t)((addr) & 0xFF), (uint8_t)(((addr) >> 8) & 0xFF) //JMP 16 бит
 #define JZ(addr) 0x0C, (uint8_t)((addr) & 0xFF),  (uint8_t)(((addr) >> 8) & 0xFF) //JZ 16 бит
 #define JNZ(addr) 0x0D, (uint8_t)((addr) & 0xFF),  (uint8_t)(((addr) >> 8) & 0xFF) //JNZ 16 бит
-#define PRINTA 0x0E //выводим А
-#define PRINTAL 0xAE //выводим АL
+#define PRINTAL 0x0E //выводим АL
+#define PRINTA 0xAE //выводим АL
 #define HLT 0xFF //халт
-#define LDAL(x) 0xA1, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
-#define LDAH(x) 0xA2, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
-#define LDBL(x) 0xB1, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
-#define LDBH(x) 0xB2, (uint8_t)((x) & 0xFF), (uint8_t)(((x) >> 8) & 0xFF)
+#define LDAL(x) 0xA1, (uint8_t)(x)
+#define LDAH(x) 0xA2, (uint8_t)(x)
+#define LDBL(x) 0xB1, (uint8_t)(x)
+#define LDBH(x) 0xB2, (uint8_t)(x)
 
 typedef struct 
 {
-    uint16_t AL, AH, BL, BH;
+    uint8_t AL, AH, BL, BH;
     uint8_t A, B;
+    uint16_t AX, BX;
     uint16_t PC;
     uint8_t Z;
 } CPU;
@@ -54,7 +55,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {LOAD_A(0x42),PRINTA,LDAL(88),PRINTAL, 0xFF};
+    uint8_t demo[] = {LOAD_A(0x42),PRINTA,LDAL(0x42),PRINTAL, 0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -70,39 +71,44 @@ int main(int argc, char **argv) {
 
     if (prog) load_binary(prog); else load_demo_program();
 
-    CPU cpu = { .A = 0, .B = 0, .PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0, .BH = 0};
+    CPU cpu = { .A = 0, .B = 0, .PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0, .BH = 0, .AX = 0, .BX = 0};
 
     for (;;) {
         uint8_t op = mem[cpu.PC++];
         if (trace) {
-            printf("\n PC=%04X OP=%02X  A=%02X B=%02X Z=%d AL=%04X AH=%04X BL=%04X BH=%04X\n",
-                   (cpu.PC-1) & 0xFFFF, op, cpu.A, cpu.B, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH);
+            printf("\n PC=%04u OP=%04X  A=%02u B=%02u Z=%02d AL=%02u AH=%02u BL=%02u BH=%02u AX=%04u BX=%04u\n",
+                (cpu.PC-1) & 0xFFFF, op, cpu.A, cpu.B, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH, cpu.AX, cpu.BX);
         }
         switch (op) {
-            case 0xA1: { // LDAL #imm16 (загрузить 16-битное число в AL)
-            uint16_t val = rd16(cpu.PC); // читаем 16 бит из памяти
-            cpu.PC += 2;                 // сдвигаем PC на 2 байта
-            cpu.AL = val;                // сохраняем в регистр AL
-            setZ(&cpu, (uint8_t)cpu.AL); // выставляем флаг Z по младшему байту (можно и по всему AL)
-                } break;
-            case 0xA2: {
-            uint16_t val =rd16(cpu.PC);
-            cpu.PC += 2;
-            cpu.AH = val;
-            setZ(&cpu, (uint8_t)cpu.AH);
-                } break;
-            case 0xB1: { // LDAL #imm16 (загрузить 16-битное число в BL)
-            uint16_t val = rd16(cpu.PC); // читаем 16 бит из памяти
-            cpu.PC += 2;                 // сдвигаем PC на 2 байта
-            cpu.BL = val;                // сохраняем в регистр AL
-            setZ(&cpu, (uint8_t)cpu.BL); // выставляем флаг Z по младшему байту (можно и по всему BL)
-                } break;    
-            case 0xB2: {
-            uint16_t val =rd16(cpu.PC);
-            cpu.PC += 2;
-            cpu.BH = val;
-            setZ(&cpu, (uint8_t)cpu.BH);
-                } break;    
+            case 0xA1:
+                cpu.AL = mem[cpu.PC++];
+                setZ(&cpu, cpu.AL);
+                break;
+
+            case 0xA2:
+                cpu.AH = mem[cpu.PC++];
+                setZ(&cpu, cpu.AH);
+                break;
+            case 0xA3:{
+                uint16_t value = rd16(cpu.PC);
+                cpu.PC += 2;
+                cpu.AX = value;
+                setZ(&cpu, cpu.AX);}
+                break;
+            case 0xB1: 
+                cpu.BL = mem[cpu.PC++];
+                setZ(&cpu, (uint8_t)cpu.BL);
+                break; 
+            case 0xB2: 
+                cpu.BH = mem[cpu.PC++];
+                setZ(&cpu, cpu.BH);
+                break;  
+            case 0xB3:{
+                uint16_t value = rd16(cpu.PC);
+                cpu.PC += 2;
+                cpu.BX = value;
+                setZ(&cpu, (uint8_t)cpu.BX);}
+                break;
             case 0x00: /* NOP */ break;
 
             case 0x01: // LDA #imm
@@ -171,22 +177,21 @@ int main(int argc, char **argv) {
                 if (!cpu.Z) cpu.PC = addr;
             } break;
 
-            case 0x0E: // OUTA
+            case 0x0E: // OUTAL
                 if (cpu.A >= 32){
-                    printf("%c", (unsigned)cpu.A);
+                    printf("%c", (unsigned)cpu.AL);
                 }
                 else{
-                    printf("%u", (unsigned)cpu.A);
+                    printf("%u", (unsigned)cpu.AL);
                 }
             break;
-            case 0xAE: //OUTAL
-                printf("%u", (unsigned)cpu.AL);
+            case 0xAE: //OUTA
+                printf("%u", (unsigned)cpu.A);
                 break;
 
             case 0xFF: // HALT
                 if (trace) printf("HALT\n");
                 return 0;
-
             default:
                 fprintf(stderr, "Illegal opcode %02X at %04X\n", op, (cpu.PC-1)&0xFFFF);
                 return 1;
