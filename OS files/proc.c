@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
             } break;
 
             case 0x0E: // OUTAL
-                if (cpu.A >= 32){
+                if (cpu.AL >= 32){
                     printf("%c", (unsigned)cpu.AL);
                 }
                 else{
@@ -186,12 +186,20 @@ int main(int argc, char **argv) {
                 }
             break;
             case 0xAE: //OUTA
-                printf("%u", (unsigned)cpu.A);
+                printf("%c", (unsigned)cpu.A);
                 break;
+            
+            case 0xD0: // CMP A, B (сравнение A и B)
+                if (cpu.A == cpu.B){
+                    cpu.Z = 1;}
+                else{
+                    cpu.Z = 0;}
+                break;    
 
             case 0xFF: // HALT
                 if (trace) printf("HALT\n");
                 return 0;
+            
             default:
                 fprintf(stderr, "Illegal opcode %02X at %04X\n", op, (cpu.PC-1)&0xFFFF);
                 return 1;
