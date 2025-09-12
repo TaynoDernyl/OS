@@ -49,8 +49,8 @@ def save_out():
         return 1    
 #===================================
 def read():
-    stroke = binaryd.read()
     binaryd.seek(0)
+    stroke = binaryd.read()
     for b in stroke:
         print(hex(b), end=" ")  
     print()
@@ -149,9 +149,9 @@ def switch(incode, operrand):
     elif incode == "":
         start()
     elif incode == "b":
+        binaryd.seek(0, 2)
         size = binaryd.tell()
         binaryd.truncate(size -1)
-        binaryd.seek(0, 2)
         start() 
     elif incode == "r":
         read()
