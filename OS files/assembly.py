@@ -49,9 +49,8 @@ def save_out():
         return 1    
 #===================================
 def read():
-    temp = keyboard.read_key()
-    binaryd.seek(0)
     stroke = binaryd.read()
+    binaryd.seek(0)
     for b in stroke:
         print(hex(b), end=" ")  
     print()
@@ -81,10 +80,25 @@ def switch(incode, operrand):
             binaryd = open("temp.bin", "wb+")
         print("вы в файле:", file)  
         start()
-    if incode == "q":
+    elif incode == "разослать":
+        try:
+            if operrand == "школе":
+                print("разосланы фотки стейси всей школе")
+            elif operrand == "задире":
+                print("респект от задиры получен")
+            else:
+                print("не разослано")   
+        except:
+            print("не разослано")    
+        start()
+    elif incode == "q":
         binaryd.seek(0, 2)
         number = struct.pack("<B", 0xFF)
         binaryd.write(number)
+    elif incode == "comp":
+        number = struct.pack("<B", 0xD0)
+        binaryd.write(number)
+        start()
     elif incode == "f":
         number = struct.pack("<B", 0xFF)
         binaryd.write(number)
@@ -220,11 +234,11 @@ def switch(incode, operrand):
         number = struct.pack("<B", 0x0A)
         binaryd.write(number)    
         start()    
-    elif incode == "print":
+    elif incode == "printl":
         number = struct.pack("<B", 0x0E)
         binaryd.write(number)    
         start()
-    elif incode == "printl":
+    elif incode == "print":
         number = struct.pack("<B", 0xAE)
         binaryd.write(number)    
         start()   
