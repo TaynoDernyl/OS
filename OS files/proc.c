@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <conio.h>
 
 #define MEM_SIZE 65535
 
@@ -186,8 +187,11 @@ int main(int argc, char **argv) {
                 }
             break;
             case 0xAE: //OUTA
-                printf("%c", (unsigned)cpu.A);
+                printf("%u", (unsigned)cpu.A);
                 break;
+            case 0xF9:{ //input
+                cpu.AL = getch();
+            } break;
             
             case 0xD0: // CMP A, B (сравнение A и B)
                 if (cpu.A == cpu.B){
