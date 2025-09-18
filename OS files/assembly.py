@@ -1,5 +1,30 @@
 import struct
 import keyboard
+import threading 
+import os
+import time
+#===================================
+def enter_for_read():
+    try:
+        temp = int(input(":"))
+        return temp
+    except:
+        return 0    
+#===================================
+def auto_save():
+    while not stop_thread.is_set():
+        if stop_thread.wait(60):
+            break
+        temp_save = open("##temp##.bin", "wb+")
+        try:
+            binaryd.seek(0)
+            save_out_file = binaryd.read()
+            temp_save.write(save_out_file)
+            binaryd.seek(0, 2)
+        except:
+            print("ошибка?")    
+t = threading.Thread(target=auto_save)  
+stop_thread = threading.Event()  
 #===================================
 file = input("напишите навзание файла для открытия:")
 try:
@@ -19,7 +44,8 @@ except:
         file = "temp.bin"
         binaryd = open("temp.bin", "wb+")
         print("автоматически создан временный файл")
-print("вы в файле:", file)   
+print("вы в файле:", file)  
+t.start()
 #=================================== 
 registers = {
     "A": 0,
@@ -50,11 +76,64 @@ def save_out():
 #===================================
 def read():
     binaryd.seek(0)
+    index = 0
     stroke = binaryd.read()
-    for b in stroke:
-        print(hex(b), end=" ")  
-    print()
-    return 0
+    if len(stroke) == 0:
+        print("файл пуст")
+        return
+    while True:
+
+        os.system("cls" if os.name == "nt" else "clear")
+
+        # выводим байты
+        for b in stroke:
+            print(f"0x{b:02x}", end=" ")
+        print()
+
+        size = len(stroke)
+
+        # рисуем указатель
+        for i in range(size):
+            if i == index:
+                print("^", end="    ")
+            else:
+                print(" ", end="    ")
+        print()
+        temp = ""
+        key = keyboard.read_key()  
+        if key == "left":
+            index = (index - 1) % size
+            time.sleep(0.15)
+        elif key == "right":
+            index = (index + 1) % size
+            time.sleep(0.15)
+        elif key in ("q", "esc"):
+            os.system("cls" if os.name == "nt" else "clear")
+            break
+        elif key in "0123456789abcdef":
+            while True:
+                k = keyboard.read_key()
+                if k == "enter":
+                    break
+                elif k in "0123456789abcdef":
+                    if len(temp) >= 2:
+                        pass
+                    else:
+                        time.sleep(0.15)
+                        temp += k
+                        print(k, end="", flush=True)
+            try:
+                if temp:
+                    value = int(temp, 16)
+                    binaryd.seek(index)
+                    number = struct.pack("<B", value)
+                    binaryd.write(number)
+                    binaryd.flush()
+                    return read()
+            except:
+                print("выход")
+                break
+    return          
 #===================================    
 def parse_number(s):
     if s is None:
@@ -71,6 +150,7 @@ def parse_number(s):
 def switch(incode, operrand):
     global file
     global binaryd
+    binaryd.seek(0, 2)
     if incode == "sf":
         file = input("напишите навзание файла для открытия:")
         try:
@@ -80,6 +160,15 @@ def switch(incode, operrand):
             binaryd = open("temp.bin", "wb+")
         print("вы в файле:", file)  
         start()
+    elif incode == "clear":
+        print("уверен?")
+        temp = input("y/n:")
+        if temp == "y" or temp == "Y" or temp == "yes":
+            binaryd.truncate(0)
+            print("удалено")
+        else:
+            print("отменено")
+        start()        
     elif incode == "разослать":
         try:
             if operrand == "школе":
@@ -95,6 +184,8 @@ def switch(incode, operrand):
         binaryd.seek(0, 2)
         number = struct.pack("<B", 0xFF)
         binaryd.write(number)
+        stop_thread.set()
+        t.join()
     elif incode == "comp":
         number = struct.pack("<B", 0xD0)
         binaryd.write(number)
@@ -437,10 +528,13 @@ def start():
     command = parts[0]
 
     try:
-        opperand = parse_number(parts[1])
+        opperand = parse_number(parts[1])  
     except IndexError:
         opperand = 0
 
-    switch(command, opperand)    
-#===================================        
+    switch(command, opperand)   
+#===================================
+def stop():
+    pass        
+#===================================
 start()    
