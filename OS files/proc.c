@@ -73,7 +73,7 @@ static void load_demo_program(void){
 }
 
 int main(int argc, char **argv) {
-    printf("Welcome to Letos\n");
+    printf("Welcome to Letos 0.0.3!\n");
     int trace = 0;
     const char *prog = NULL;
 
