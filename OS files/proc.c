@@ -67,7 +67,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {MOV,0,0,9,0x0E, 0xFF};
+    uint8_t demo[] = {MOV,0,0,33,0xD0,0,33,0x0E, 0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -145,58 +145,7 @@ int main(int argc, char **argv) {
                 }
             } break;
 
-            case 0xA1:
-                cpu.AL = mem[cpu.PC++ % MEM_SIZE];
-                setZ(&cpu, cpu.AL);
-                break;
-
-            case 0xA2:
-                cpu.AH = mem[cpu.PC++ % MEM_SIZE];
-                setZ(&cpu, cpu.AH);
-                break;
-            case 0xA3:{
-                uint16_t value = rd16(cpu.PC);
-                cpu.PC += 2;
-                cpu.AX = value;
-                setZ(&cpu, cpu.AX);}
-                break;
-            case 0xB1: 
-                cpu.BL = mem[cpu.PC++ % MEM_SIZE];
-                setZ(&cpu, (uint16_t)cpu.BL);
-                break; 
-            case 0xB2: 
-                cpu.BH = mem[cpu.PC++ % MEM_SIZE];
-                setZ(&cpu, cpu.BH);
-                break;  
-            case 0xB3:{
-                uint16_t value = rd16(cpu.PC);
-                cpu.PC += 2;
-                cpu.BX = value;
-                setZ(&cpu, cpu.BX);}
-                break;
             case 0x00: /* NOP */ break;
-
-            case 0x01: // LDA #imm
-                cpu.A = mem[cpu.PC++ % MEM_SIZE];
-                setZ(&cpu, cpu.A);
-                break;
-
-            case 0x02: // LDB #imm
-                cpu.B = mem[cpu.PC++ % MEM_SIZE];
-                setZ(&cpu, cpu.B);
-                break;
-
-            case 0x03: { // LDA [addr16]
-                uint16_t addr = rd16(cpu.PC); cpu.PC += 2;
-                cpu.A = mem[addr % MEM_SIZE];
-                setZ(&cpu, cpu.A);
-            } break;
-
-            case 0x04: { // LDB [addr16]
-                uint16_t addr = rd16(cpu.PC); cpu.PC += 2;
-                cpu.B = mem[addr % MEM_SIZE];
-                setZ(&cpu, cpu.B);
-            } break;
 
             case 0x05: { // STA [addr16]
                 uint16_t addr = rd16(cpu.PC); cpu.PC += 2;
@@ -354,9 +303,48 @@ int main(int argc, char **argv) {
                 cpu.AL = getch();
             } break;
             
-            case 0xD0: // CMP A, B
-                cpu.Z = (cpu.A == cpu.B);
-                break;    
+            case 0xD0: { // CMP reg1, reg2
+                uint8_t op1 = mem[cpu.PC++ % MEM_SIZE];
+                uint8_t op2 = mem[cpu.PC++ % MEM_SIZE];
+                uint16_t val1 = 0, val2 = 0;
+
+                // читаем первое значение
+                switch (op1) {
+                    case REG_AL: val1 = cpu.AL; break;
+                    case REG_AH: val1 = cpu.AH; break;
+                    case REG_BL: val1 = cpu.BL; break;
+                    case REG_BH: val1 = cpu.BH; break;
+                    case REG_A:  val1 = cpu.A;  break;
+                    case REG_B:  val1 = cpu.B;  break;
+                    case REG_AX: val1 = cpu.AX; break;
+                    case REG_BX: val1 = cpu.BX; break;
+                    default:
+                        val1 = op1; // если не регистр — считать числом
+                        break;
+                }
+
+                // читаем второе значение
+                switch (op2) {
+                    case REG_AL: val2 = cpu.AL; break;
+                    case REG_AH: val2 = cpu.AH; break;
+                    case REG_BL: val2 = cpu.BL; break;
+                    case REG_BH: val2 = cpu.BH; break;
+                    case REG_A:  val2 = cpu.A;  break;
+                    case REG_B:  val2 = cpu.B;  break;
+                    case REG_AX: val2 = cpu.AX; break;
+                    case REG_BX: val2 = cpu.BX; break;
+                    default:
+                        val2 = op2;
+                        break;
+                }
+
+                cpu.Z = (val1 == val2);
+
+                if (trace) {
+                    printf("CMP: %u == %u -> Z=%u\n", val1, val2, cpu.Z);
+                }
+            } break;
+   
 
             case 0xFF: // HALT
                 if (trace) printf("HALT\n");
