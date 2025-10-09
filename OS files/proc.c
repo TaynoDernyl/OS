@@ -67,7 +67,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {LDAL(33),0x0E, 0xFF};
+    uint8_t demo[] = {MOV,0,0,9,0x0E, 0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
         }
         
         switch (op) {
-            case MOV: {
+            case MOV: { 
                 uint8_t flags = mem[cpu.PC++ % MEM_SIZE];
                 uint8_t dst = mem[cpu.PC++ % MEM_SIZE];
                 uint8_t src = mem[cpu.PC++ % MEM_SIZE];
@@ -112,8 +112,8 @@ int main(int argc, char **argv) {
                         case REG_A:  val = cpu.A;  break;
                         case REG_B:  val = cpu.B;  break;
                         default:
-                            fprintf(stderr, "Invalid 8-bit src reg %u (flags=%u,dst=%u)\n", src, flags, dst);
-                            continue; // пропускаем, не выходим из программы
+                            val = src;
+                            break; // пропускаем, не выходим из программы
                     }
                     switch (dst) {
                         case REG_AL: cpu.AL = val; break;
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
                         case REG_B:  cpu.B  = val; break;
                         default:
                             fprintf(stderr, "Invalid 8-bit dst reg %u (flags=%u,src=%u)\n", dst, flags, src);
-                            continue;
+                            break;
                     }
                 } else { // MOV 16-бит
                     uint16_t val = 0;
@@ -132,15 +132,15 @@ int main(int argc, char **argv) {
                         case REG_AX: val = cpu.AX; break;
                         case REG_BX: val = cpu.BX; break;
                         default:
-                            fprintf(stderr, "Invalid 16-bit src reg %u (flags=%u,dst=%u)\n", src, flags, dst);
-                            continue;
+                            val = src;
+                            break;
                     }
                     switch (dst) {
                         case REG_AX: cpu.AX = val; break;
                         case REG_BX: cpu.BX = val; break;
                         default:
                             fprintf(stderr, "Invalid 16-bit dst reg %u (flags=%u,src=%u)\n", dst, flags, src);
-                            continue;
+                            break;
                     }
                 }
             } break;
