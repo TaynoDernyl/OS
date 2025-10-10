@@ -33,16 +33,13 @@ enum {
     REG_AH = 1,
     REG_BL = 2,
     REG_BH = 3,
-    REG_A  = 4,
-    REG_B  = 5,
-    REG_AX = 6,
-    REG_BX = 7,
+    REG_AX = 4,
+    REG_BX = 5,
 };
 
 typedef struct 
 {
     uint8_t AL, AH, BL, BH;
-    uint8_t A, B;
     uint16_t AX, BX;
     uint16_t PC;
     uint8_t Z;
@@ -84,13 +81,13 @@ int main(int argc, char **argv) {
 
     if (prog) load_binary(prog); else load_demo_program();
 
-    CPU cpu = { .A = 0, .B = 0, .PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0, .BH = 0, .AX = 0, .BX = 0};
+    CPU cpu = {.PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0, .BH = 0, .AX = 0, .BX = 0};
 
     for (;;) {
         uint8_t op = mem[cpu.PC++ % MEM_SIZE];
         if (trace) {
-            printf("\n PC=%04u OP=%02X  A=%02u B=%02u Z=%02d AL=%02u AH=%02u BL=%02u BH=%02u AX=%04u BX=%04u\n",
-                (cpu.PC-1) & 0xFFFF, op, cpu.A, cpu.B, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH, cpu.AX, cpu.BX);
+            printf("\n PC=%04u OP=%02X Z=%02d AL=%02u AH=%02u BL=%02u BH=%02u AX=%04u BX=%04u\n",
+                (cpu.PC-1) & 0xFFFF, op, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH, cpu.AX, cpu.BX);
         }
         
         switch (op) {
@@ -109,8 +106,6 @@ int main(int argc, char **argv) {
                         case REG_AH: val = cpu.AH; break;
                         case REG_BL: val = cpu.BL; break;
                         case REG_BH: val = cpu.BH; break;
-                        case REG_A:  val = cpu.A;  break;
-                        case REG_B:  val = cpu.B;  break;
                         default:
                             val = src;
                             break; // пропускаем, не выходим из программы
@@ -120,8 +115,6 @@ int main(int argc, char **argv) {
                         case REG_AH: cpu.AH = val; break;
                         case REG_BL: cpu.BL = val; break;
                         case REG_BH: cpu.BH = val; break;
-                        case REG_A:  cpu.A  = val; break;
-                        case REG_B:  cpu.B  = val; break;
                         default:
                             fprintf(stderr, "Invalid 8-bit dst reg %u (flags=%u,src=%u)\n", dst, flags, src);
                             break;
@@ -147,15 +140,87 @@ int main(int argc, char **argv) {
 
             case 0x00: /* NOP */ break;
 
-            case 0x05: { // STA [addr16]
-                uint16_t addr = rd16(cpu.PC); cpu.PC += 2;
-                mem[addr % MEM_SIZE] = cpu.A;
+            case 0x04: { // LOAD регистр, [addr16]
+                uint8_t reg = mem[cpu.PC++ % MEM_SIZE];   // какой регистр загружаем
+                uint16_t addr = rd16(cpu.PC); 
+                cpu.PC += 2;
+
+                switch (reg) {
+                    case REG_AL:
+                        cpu.AL = mem[addr % MEM_SIZE];
+                        setZ(&cpu, cpu.AL);
+                        break;
+                    case REG_AH:
+                        cpu.AH = mem[addr % MEM_SIZE];
+                        setZ(&cpu, cpu.AH);
+                        break;
+                    case REG_BL:
+                        cpu.BL = mem[addr % MEM_SIZE];
+                        setZ(&cpu, cpu.BL);
+                        break;
+                    case REG_BH:
+                        cpu.BH = mem[addr % MEM_SIZE];
+                        setZ(&cpu, cpu.BH);
+                        break;
+                    case REG_AX: {
+                        uint8_t lo = mem[addr % MEM_SIZE];
+                        uint8_t hi = mem[(addr + 1) % MEM_SIZE];
+                        cpu.AX = (hi << 8) | lo;
+                        setZ(&cpu, cpu.AX);
+                    } break;
+                    case REG_BX: {
+                        uint8_t lo = mem[addr % MEM_SIZE];
+                        uint8_t hi = mem[(addr + 1) % MEM_SIZE];
+                        cpu.BX = (hi << 8) | lo;
+                        setZ(&cpu, cpu.BX);
+                    } break;
+                    default:
+                        fprintf(stderr, "Invalid reg %u in LOAD\n", reg);
+                        break;
+                }
+
+                if (trace) {
+                    printf("LOAD reg=%u ← [%04X]\n", reg, addr);
+                }
             } break;
 
-            case 0x06: { // STB [addr16]
-                uint16_t addr = rd16(cpu.PC); cpu.PC += 2;
-                mem[addr % MEM_SIZE] = cpu.B;
+
+            case 0x05: { // STORE [addr16], регистр
+                uint8_t reg = mem[cpu.PC++ % MEM_SIZE];   // какой регистр сохраняем
+                uint16_t addr = rd16(cpu.PC);
+                cpu.PC += 2;
+
+                switch (reg) {
+                    case REG_AL:
+                        mem[addr % MEM_SIZE] = cpu.AL;
+                        break;
+                    case REG_AH:
+                        mem[addr % MEM_SIZE] = cpu.AH;
+                        break;
+                    case REG_BL:
+                        mem[addr % MEM_SIZE] = cpu.BL;
+                        break;
+                    case REG_BH:
+                        mem[addr % MEM_SIZE] = cpu.BH;
+                        break;
+                    case REG_AX:
+                        mem[addr % MEM_SIZE] = cpu.AX & 0xFF;             // младший байт
+                        mem[(addr + 1) % MEM_SIZE] = (cpu.AX >> 8) & 0xFF; // старший байт
+                        break;
+                    case REG_BX:
+                        mem[addr % MEM_SIZE] = cpu.BX & 0xFF;
+                        mem[(addr + 1) % MEM_SIZE] = (cpu.BX >> 8) & 0xFF;
+                        break;
+                    default:
+                        fprintf(stderr, "Invalid reg %u in STORE\n", reg);
+                        break;
+                }
+
+                if (trace) {
+                    printf("STORE reg=%u → [%04X]\n", reg, addr);
+                }
             } break;
+
 
             case 0x07:{ // SUB A,B
                 uint8_t oper1 = mem[cpu.PC++ % MEM_SIZE];
@@ -167,18 +232,16 @@ int main(int argc, char **argv) {
                     case REG_AH: val = cpu.AH; break;
                     case REG_BL: val = cpu.BL; break;
                     case REG_BH: val = cpu.BH; break;
-                    case REG_A:  val = cpu.A;  break;
-                    case REG_B:  val = cpu.B;  break;
                     case REG_AX:
                     {
-                        if (oper1 == REG_A || oper1 == REG_B || oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
+                        if (oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
                             printf("invalid operation:ADD 16 bit to 8 bit");
                         }
                         valid = 1;
                     }break;
                     case REG_BX:
                     {
-                        if (oper1 == REG_A || oper1 == REG_B || oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
+                        if (oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
                             printf("invalid operation:ADD 16 bit to 8 bit");
                         }
                         valid = 1;
@@ -192,9 +255,7 @@ int main(int argc, char **argv) {
                     case REG_AL: cpu.AL -= val; break;
                     case REG_AH: cpu.AH -= val; break;
                     case REG_BL: cpu.BL -= val; break;
-                    case REG_BH: cpu.BH -= val; break;
-                    case REG_A: cpu.A -= val; break;
-                    case REG_B: cpu.B -= val; break;      
+                    case REG_BH: cpu.BH -= val; break;     
                     case REG_AX: cpu.AX -= val; break;       
                     case REG_BX: cpu.BX -= val; break;    
                 default:
@@ -214,18 +275,16 @@ int main(int argc, char **argv) {
                     case REG_AH: val = cpu.AH; break;
                     case REG_BL: val = cpu.BL; break;
                     case REG_BH: val = cpu.BH; break;
-                    case REG_A:  val = cpu.A;  break;
-                    case REG_B:  val = cpu.B;  break;
                     case REG_AX:
                     {
-                        if (oper1 == REG_A || oper1 == REG_B || oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
+                        if (oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
                             printf("invalid operation:ADD 16 bit to 8 bit");
                         }
                         valid = 1;
                     }break;
                     case REG_BX:
                     {
-                        if (oper1 == REG_A || oper1 == REG_B || oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
+                        if (oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
                             printf("invalid operation:ADD 16 bit to 8 bit");
                         }
                         valid = 1;
@@ -240,8 +299,6 @@ int main(int argc, char **argv) {
                     case REG_AH: cpu.AH += val; break;
                     case REG_BL: cpu.BL += val; break;
                     case REG_BH: cpu.BH += val; break;
-                    case REG_A: cpu.A += val; break;
-                    case REG_B: cpu.B += val; break;      
                     case REG_AX: cpu.AX += val; break;       
                     case REG_BX: cpu.BX += val; break;    
                 default:
@@ -258,8 +315,6 @@ int main(int argc, char **argv) {
                 case REG_AH: cpu.AH++; setZ(&cpu, cpu.AH); break;
                 case REG_BL: cpu.BL++; setZ(&cpu, cpu.BL); break;
                 case REG_BH: cpu.BH++; setZ(&cpu, cpu.BH); break;
-                case REG_A:  cpu.A++;  setZ(&cpu, cpu.A);  break;
-                case REG_B:  cpu.B++;  setZ(&cpu, cpu.B);  break;
                 case REG_AX: cpu.AX++; setZ(&cpu, (uint8_t)cpu.AX); break;
                 case REG_BX: cpu.BX++; setZ(&cpu, (uint8_t)cpu.BX); break;
                 default: fprintf(stderr, "Invalid reg %u in INC\n", reg); exit(1);
@@ -273,8 +328,6 @@ int main(int argc, char **argv) {
                 case REG_AH: cpu.AH--; setZ(&cpu, cpu.AH); break;
                 case REG_BL: cpu.BL--; setZ(&cpu, cpu.BL); break;
                 case REG_BH: cpu.BH--; setZ(&cpu, cpu.BH); break;
-                case REG_A:  cpu.A--;  setZ(&cpu, cpu.A);  break;
-                case REG_B:  cpu.B--;  setZ(&cpu, cpu.B);  break;
                 case REG_AX: cpu.AX--; setZ(&cpu, (uint8_t)cpu.AX); break;
                 case REG_BX: cpu.BX--; setZ(&cpu, (uint8_t)cpu.BX); break;
                 default: fprintf(stderr, "Invalid reg %u in INC\n", reg); exit(1);
@@ -295,7 +348,7 @@ int main(int argc, char **argv) {
                 if (!cpu.Z) cpu.PC = addr;
             } break;
 
-            case 0x0E: // OUTAL
+            case 0x0E: // OUT
                 printf("%c", cpu.AL);
             break;
 
@@ -314,8 +367,6 @@ int main(int argc, char **argv) {
                     case REG_AH: val1 = cpu.AH; break;
                     case REG_BL: val1 = cpu.BL; break;
                     case REG_BH: val1 = cpu.BH; break;
-                    case REG_A:  val1 = cpu.A;  break;
-                    case REG_B:  val1 = cpu.B;  break;
                     case REG_AX: val1 = cpu.AX; break;
                     case REG_BX: val1 = cpu.BX; break;
                     default:
@@ -329,8 +380,6 @@ int main(int argc, char **argv) {
                     case REG_AH: val2 = cpu.AH; break;
                     case REG_BL: val2 = cpu.BL; break;
                     case REG_BH: val2 = cpu.BH; break;
-                    case REG_A:  val2 = cpu.A;  break;
-                    case REG_B:  val2 = cpu.B;  break;
                     case REG_AX: val2 = cpu.AX; break;
                     case REG_BX: val2 = cpu.BX; break;
                     default:
