@@ -24,42 +24,78 @@ ascii_table = {
 }
 
 #===================================
-def mov(flag, op1, op2):
+def mov(op1, op2):
     binaryd.write(struct.pack("<B", 0x20))
-    flag = int(flag)
-    if op1 in table_of_reg:
-        op1 = table_of_reg[op1]
-        if op2 in table_of_reg:
-            op2 = table_of_reg[op2]
-        else:
-            op2 = int(op2)
-        try:
-            binaryd.write(struct.pack("<B", flag))
-            binaryd.write(struct.pack("<B", op1))
-            binaryd.write(struct.pack("<B", op2))
-            return 0
-        except:
-            print("ошибка 1")
-            return 1
+    if op1 == "ax" or op1 == "bx":
+        flag = 1
     else:
-        op1 = int(op1)
-        if op1 >= 0 and op1 <=7:
+        flag = 0
+    if flag == 0:
+        if op1 in table_of_reg:
+            op1 = table_of_reg[op1]
             if op2 in table_of_reg:
                 op2 = table_of_reg[op2]
             else:
-                op2 = int(op2)    
+                op2 = int(op2)
             try:
                 binaryd.write(struct.pack("<B", flag))
                 binaryd.write(struct.pack("<B", op1))
                 binaryd.write(struct.pack("<B", op2))
                 return 0
             except:
-                print("ошибка 2")
+                print("ошибка 1")
                 return 1
-        else:    
-            print("введен неверный регистр!")
-            return 1
-    
+        else:
+            op1 = int(op1)
+            if op1 >= 0 and op1 <=7:
+                if op2 in table_of_reg:
+                    op2 = table_of_reg[op2]
+                else:
+                    op2 = int(op2)    
+                try:
+                    binaryd.write(struct.pack("<B", flag))
+                    binaryd.write(struct.pack("<B", op1))
+                    binaryd.write(struct.pack("<B", op2))
+                    return 0
+                except:
+                    print("ошибка 2")
+                    return 1
+            else:    
+                print("введен неверный регистр!")
+                return 1
+    else:
+        if op1 in table_of_reg:
+            op1 = table_of_reg[op1]
+            if op2 in table_of_reg:
+                op2 = table_of_reg[op2]
+            else:
+                op2 = int(op2)
+            try:
+                binaryd.write(struct.pack("<B", flag))
+                binaryd.write(struct.pack("<B", op1))
+                binaryd.write(struct.pack("<B", op2))
+                return 0
+            except:
+                print("ошибка 1")
+                return 1
+        else:
+            op1 = int(op1)
+            if op1 >= 0 and op1 <=7:
+                if op2 in table_of_reg:
+                    op2 = table_of_reg[op2]
+                else:
+                    op2 = int(op2)    
+                try:
+                    binaryd.write(struct.pack("<B", flag))
+                    binaryd.write(struct.pack("<B", op1))
+                    binaryd.write(struct.pack("<B", op2))
+                    return 0
+                except:
+                    print("ошибка 2")
+                    return 1
+            else:    
+                print("введен неверный регистр!")
+                return 1
 #===================================
 def enter_for_read():
     try:
@@ -109,23 +145,17 @@ table_of_reg = {
     "AH": 1,
     "BL": 2,
     "BH": 3,
-    "A": 4,
-    "B": 5,
-    "AX": 6,
-    "BX": 7,
+    "AX": 4,
+    "BX": 5,
     "al": 0,
     "ah": 1,
     "bl": 2,
     "bh": 3,
-    "a": 4,
-    "b": 5,
-    "ax": 6,
-    "bx": 7
+    "ax": 4,
+    "bx": 5
 }
 
 registers = {
-    "A": 0,
-    "B": 0,
     "AL": 0,
     "AH": 0,
     "BL": 0,
@@ -278,11 +308,11 @@ def switch(incode, operrand):
             print("неизвестная ошибка")
             start()   
     elif incode == "mov":
-        print("введи флаг, регистр и значение ниже через пробел:")
+        print("регистр и значение ниже через пробел:")
         a = input(":")
         try:
             parts = a.split()
-            mov(parts[0], parts[1], parts[2])
+            mov(parts[0], parts[1])
             start()
         except:
             print("ошибка")
