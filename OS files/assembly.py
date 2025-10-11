@@ -25,60 +25,26 @@ ascii_table = {
 
 #===================================
 def mov(op1, op2):
-    binaryd.write(struct.pack("<B", 0x20))
     if op1 == "ax" or op1 == "bx":
         flag = 1
     else:
         flag = 0
-    if flag == 0:
-        if op1 in table_of_reg:
+    if op1 in table_of_reg:
             op1 = table_of_reg[op1]
             if op2 in table_of_reg:
                 op2 = table_of_reg[op2]
             else:
                 op2 = int(op2)
             try:
+                binaryd.write(struct.pack("<B", 0x20))
                 binaryd.write(struct.pack("<B", flag))
                 binaryd.write(struct.pack("<B", op1))
                 binaryd.write(struct.pack("<B", op2))
                 return 0
             except:
                 print("ошибка 1")
-                return 1
-        else:
-            op1 = int(op1)
-            if op1 >= 0 and op1 <=7:
-                if op2 in table_of_reg:
-                    op2 = table_of_reg[op2]
-                else:
-                    op2 = int(op2)    
-                try:
-                    binaryd.write(struct.pack("<B", flag))
-                    binaryd.write(struct.pack("<B", op1))
-                    binaryd.write(struct.pack("<B", op2))
-                    return 0
-                except:
-                    print("ошибка 2")
-                    return 1
-            else:    
-                print("введен неверный регистр!")
                 return 1
     else:
-        if op1 in table_of_reg:
-            op1 = table_of_reg[op1]
-            if op2 in table_of_reg:
-                op2 = table_of_reg[op2]
-            else:
-                op2 = int(op2)
-            try:
-                binaryd.write(struct.pack("<B", flag))
-                binaryd.write(struct.pack("<B", op1))
-                binaryd.write(struct.pack("<B", op2))
-                return 0
-            except:
-                print("ошибка 1")
-                return 1
-        else:
             op1 = int(op1)
             if op1 >= 0 and op1 <=7:
                 if op2 in table_of_reg:
@@ -86,6 +52,7 @@ def mov(op1, op2):
                 else:
                     op2 = int(op2)    
                 try:
+                    binaryd.write(struct.pack("<B", 0x20))
                     binaryd.write(struct.pack("<B", flag))
                     binaryd.write(struct.pack("<B", op1))
                     binaryd.write(struct.pack("<B", op2))
@@ -96,13 +63,6 @@ def mov(op1, op2):
             else:    
                 print("введен неверный регистр!")
                 return 1
-#===================================
-def enter_for_read():
-    try:
-        temp = int(input(":"))
-        return temp
-    except:
-        return 0    
 #===================================
 def auto_save():
     while not stop_thread.is_set():
@@ -253,7 +213,7 @@ def parse_number(s):
     except ValueError:
         return s
 #===================================
-def switch(incode, operrand):
+def switch(incode, operrand, operrand2):
     global file
     global binaryd
     binaryd.seek(0, 2)
@@ -308,11 +268,8 @@ def switch(incode, operrand):
             print("неизвестная ошибка")
             start()   
     elif incode == "mov":
-        print("регистр и значение ниже через пробел:")
-        a = input(":")
         try:
-            parts = a.split()
-            mov(parts[0], parts[1])
+            mov(operrand, operrand2)
             start()
         except:
             print("ошибка")
@@ -381,15 +338,79 @@ def switch(incode, operrand):
         binaryd.write(number)
         start()
     elif incode == "add":
-        registers["A"] = registers["A"] + registers["B"]
-        number = struct.pack("<B", 0x07)
-        binaryd.write(number)    
+        if operrand in table_of_reg:
+            number = struct.pack("<B", 0x08)
+            binaryd.write(number)    
+            temp1 = table_of_reg[operrand]
+            number = struct.pack("<B", temp1)
+            binaryd.write(number)  
+        else:
+            try:
+                operrand = int(operrand)
+            except:
+                print("ошибка регистра")
+                start()
+            if operrand >= 0 or operrand <=7:
+                number = struct.pack("<B", 0x08)
+                binaryd.write(number)    
+                temp1 = operrand
+                number = struct.pack("<B", temp1)
+                binaryd.write(number)  
+            else:    
+                print("ошибка первого операнда")
+                start()
+        if operrand2 in table_of_reg:
+            temp1 = table_of_reg[operrand2]
+            number = struct.pack("<B", temp1)
+            binaryd.write(number)              
+        else:
+            try:
+                operrand2 = int(operrand2)
+            except:
+                print("ошибка записи второго операнда")    
+                start()
+            temp1 = operrand2
+            number = struct.pack("<B", temp1)
+            binaryd.write(number)  
+
         start()
     elif incode == "sub":
-        registers["A"] = registers["A"] - registers["B"]
-        number = struct.pack("<B", 0x08)
-        binaryd.write(number)    
-        start()    
+        if operrand in table_of_reg:
+            number = struct.pack("<B", 0x07)
+            binaryd.write(number)    
+            temp1 = table_of_reg[operrand]
+            number = struct.pack("<B", temp1)
+            binaryd.write(number)  
+        else:
+            try:
+                operrand = int(operrand)
+            except:
+                print("ошибка регистра")
+                start()
+            if operrand >= 0 or operrand <=7:
+                number = struct.pack("<B", 0x07)
+                binaryd.write(number)    
+                temp1 = operrand
+                number = struct.pack("<B", temp1)
+                binaryd.write(number)  
+            else:    
+                print("ошибка первого операнда")
+                start()
+        if operrand2 in table_of_reg:
+            temp1 = table_of_reg[operrand2]
+            number = struct.pack("<B", temp1)
+            binaryd.write(number)              
+        else:
+            try:
+                operrand2 = int(operrand2)
+            except:
+                print("ошибка записи второго операнда")    
+                start()
+            temp1 = operrand2
+            number = struct.pack("<B", temp1)
+            binaryd.write(number)  
+
+        start() 
     elif incode == "inc":
         registers["A"] += 1
         number = struct.pack("<B", 0x09)
@@ -403,96 +424,21 @@ def switch(incode, operrand):
     elif incode == "print":
         number = struct.pack("<B", 0x0E)
         binaryd.write(number)    
-        start()
-    elif incode == "ldma":
-        if isinstance(operrand, int):
-            number = struct.pack("<B", 0x03)
-            binaryd.write(number)
-            registers["A"] = operrand
-            number = struct.pack("<H", operrand)
-            binaryd.write(number)
-
-        elif isinstance(operrand, str):
-            if operrand.upper() in registers:
-                number = struct.pack("<B", 0x03)
-                binaryd.write(number)
-                operrand = registers[operrand.upper()]
-                registers["A"] = operrand
-                number = struct.pack("<H", operrand)
-                binaryd.write(number)
-            else:
-                print("неизвестный регистр")
-        start()
-    elif incode == "stma":
-        if isinstance(operrand, int):
-            number = struct.pack("<B", 0x05)
-            binaryd.write(number)
-            number = struct.pack("<H", operrand)
-            binaryd.write(number)
-
-        elif isinstance(operrand, str):
-            if operrand.upper() in registers:
-                number = struct.pack("<B", 0x05)
-                binaryd.write(number)
-                operrand = registers[operrand.upper()]
-                number = struct.pack("<H", operrand)
-                binaryd.write(number)
-            else:
-                print("неизвестный регистр")
-        start()
-    elif incode == "ldmb":
-        if isinstance(operrand, int):
-            number = struct.pack("<B", 0x04)
-            binaryd.write(number)
-            registers["B"] = operrand
-            number = struct.pack("<H", operrand)
-            binaryd.write(number)
-
-        elif isinstance(operrand, str):
-            if operrand.upper() in registers:
-                number = struct.pack("<B", 0x04)
-                binaryd.write(number)
-                operrand = registers[operrand.upper()]
-                registers["B"] = operrand
-                number = struct.pack("<H", operrand)
-                binaryd.write(number)
-            else:
-                print("неизвестный регистр")
-        start() 
-    elif incode == "stmb":
-        if isinstance(operrand, int):
-            number = struct.pack("<B", 0x06)
-            binaryd.write(number)
-            number = struct.pack("<H", operrand)
-            binaryd.write(number)
-
-        elif isinstance(operrand, str):
-            if operrand.upper() in registers:
-                number = struct.pack("<B", 0x06)
-                binaryd.write(number)
-                operrand = registers[operrand.upper()]
-                number = struct.pack("<H", operrand)
-                binaryd.write(number)
-            else:
-                print("неизвестный регистр")
-        start()                 
+        start()            
     else:
         start()        
 #===================================        
 def start():
     ans = input(":")
     parts = ans.split()
-    command = parts[0]
-
-    try:
-        opperand = parse_number(parts[1])  
-    except IndexError:
-        opperand = 0
-
-    switch(command, opperand)   
-#===================================
-def stop():
-    pass        
+    command = parts[0] if parts else """"""
+    opperand = 0
+    opperand2 = 0
+    if len(parts) > 1:
+        opperand = parts[1]
+    if len(parts) > 2:
+        opperand2 = parts[2]    
+    switch(command, opperand, opperand2)   
 #===================================
 
 start()    
