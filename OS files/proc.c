@@ -247,7 +247,7 @@ int main(int argc, char **argv) {
                         valid = 1;
                     }break;
                 default:
-                    printf("invalid 8 bit reg");
+                    val = oper2;
                     break;
                 }
                 if (valid == 0){
@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
                         valid = 1;
                     }break;
                 default:
-                    printf("invalid 8 bit reg");
+                    val = oper2;
                     break;
                 }
                 if (valid == 0){
