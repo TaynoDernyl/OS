@@ -64,7 +64,8 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {MOV,0,0,33,0xD0,0,33,0x0E, 0xFF};
+    uint8_t demo[] = {MOV,0x00,0x00,0x0F,0x05, REG_AL, 0x05, 0x00, // STORE AL в [0x0005]
+    0x04, REG_BL, 0x05, 0x00,0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -180,14 +181,14 @@ int main(int argc, char **argv) {
                 }
 
                 if (trace) {
-                    printf("LOAD reg=%u ← [%04X]\n", reg, addr);
+                    printf("LOAD reg=%u [%04X]\n", reg, addr);
                 }
             } break;
 
 
             case 0x05: { // STORE [addr16], регистр
-                uint8_t reg = mem[cpu.PC++ % MEM_SIZE];   // какой регистр сохраняем
-                uint16_t addr = rd16(cpu.PC);
+                uint8_t reg = mem[cpu.PC++ % MEM_SIZE];   // 1 байт — какой регистр сохраняем
+                uint16_t addr = rd16(cpu.PC);             // читаем 2 байта адреса
                 cpu.PC += 2;
 
                 switch (reg) {
@@ -217,9 +218,10 @@ int main(int argc, char **argv) {
                 }
 
                 if (trace) {
-                    printf("STORE reg=%u → [%04X]\n", reg, addr);
+                    printf("STORE reg=%u mem[%04X]\n", reg, addr);
                 }
             } break;
+
 
 
             case 0x07:{ // SUB A,B
