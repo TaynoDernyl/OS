@@ -22,7 +22,12 @@ ascii_table = {
     112: 'p', 113: 'q', 114: 'r', 115: 's', 116: 't', 117: 'u', 118: 'v', 119: 'w',
     120: 'x', 121: 'y', 122: 'z', 123: '{', 124: '|', 125: '}', 126: '~', 127: 'DEL'
 }
-
+#===================================
+def valid_of_reg(reg):
+    if reg in table_of_reg:
+        return table_of_reg[reg]
+    else:
+        return -1
 #===================================
 def mov(op1, op2):
     if op1 == "ax" or op1 == "bx":
@@ -226,6 +231,32 @@ def switch(incode, operrand, operrand2):
             binaryd = open("temp.bin", "wb+")
         print("вы в файле:", file)  
         start()
+    elif incode == "store":
+        try:
+            a = valid_of_reg(operrand2)
+            if a >= 0:
+                binaryd.write(struct.pack("<B", 0x05))
+                binaryd.write(struct.pack("<B", a))
+                binaryd.write(struct.pack("<H", int(operrand)))
+            else:
+                print(a)
+                print("ошибка регистра!")
+        except:
+            print("ошибка записи!")    
+        start()    
+    elif incode == "load":
+        try:
+            a = valid_of_reg(operrand)
+            if a >= 0:
+                binaryd.write(struct.pack("<B", 0x04))
+                binaryd.write(struct.pack("<B", a))
+                binaryd.write(struct.pack("<H", int(operrand2)))
+            else:
+                print(a)
+                print("ошибка регистра!")
+        except:
+            print("ошибка записи!")    
+        start()    
     elif incode == "clear":
         print("уверен?")
         temp = input("y/n:")
