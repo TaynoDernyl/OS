@@ -225,10 +225,10 @@ def switch(incode, operrand, operrand2):
     global file
     global binaryd, PC_mem
     binaryd.seek(0, 2)
-    if incode == "sf":
-        file = input("напишите навзание файла для открытия:")
+    if incode == "open":
+        file = input("напишите навзание файла для открытия(с .bin в конце для корректной работы):")
         try:
-            binaryd = open(file, "wb+")
+            binaryd = open(file, "r+b")
         except:
             file = "temp.bin"
             binaryd = open("temp.bin", "wb+")
@@ -346,9 +346,7 @@ def switch(incode, operrand, operrand2):
                 print("неизвестная ошибка?")
         else:
             print("изменения не сохранены")
-            start() 
-    elif incode == "":
-        start()
+            start()   
     elif incode == "b":
         binaryd.seek(0, 2)
         size = binaryd.tell()
