@@ -23,6 +23,9 @@ ascii_table = {
     120: 'x', 121: 'y', 122: 'z', 123: '{', 124: '|', 125: '}', 126: '~', 127: 'DEL'
 }
 #===================================
+mem_for_variable = {} #наши переменные
+PC_mem = 8
+#===================================
 def valid_of_reg(reg):
     if reg in table_of_reg:
         return table_of_reg[reg]
@@ -220,7 +223,7 @@ def parse_number(s):
 #===================================
 def switch(incode, operrand, operrand2):
     global file
-    global binaryd
+    global binaryd, PC_mem
     binaryd.seek(0, 2)
     if incode == "sf":
         file = input("напишите навзание файла для открытия:")
@@ -240,7 +243,10 @@ def switch(incode, operrand, operrand2):
                 binaryd.write(struct.pack("<H", int(operrand)))
             else:
                 print(a)
-                print("ошибка регистра!")
+                print("будет записан регистр al")
+                binaryd.write(struct.pack("<B", 0x05))
+                binaryd.write(struct.pack("<B", 0x00))
+                binaryd.write(struct.pack("<H", int(operrand)))
         except:
             print("ошибка записи!")    
         start()    
@@ -261,6 +267,7 @@ def switch(incode, operrand, operrand2):
         print("уверен?")
         temp = input("y/n:")
         if temp == "y" or temp == "Y" or temp == "yes":
+            PC_mem = 8
             binaryd.truncate(0)
             print("удалено")
         else:
@@ -440,24 +447,57 @@ def switch(incode, operrand, operrand2):
             temp1 = operrand2
             number = struct.pack("<B", temp1)
             binaryd.write(number)  
-
         start() 
     elif incode == "inc":
-        registers["A"] += 1
         number = struct.pack("<B", 0x09)
         binaryd.write(number)    
+        a = valid_of_reg(operrand)
+        binaryd.write(struct.pack("<B", a))
         start()    
     elif incode == "dec":
-        registers["A"] -= 1
         number = struct.pack("<B", 0x0A)
         binaryd.write(number)    
+        a = valid_of_reg(operrand)
+        binaryd.write(struct.pack("<B", a))
         start()    
     elif incode == "print":
         number = struct.pack("<B", 0x0E)
         binaryd.write(number)    
         start()            
+    elif incode == "comp":
+        number = struct.pack("<B", 0xD0)
+        binaryd.write(number)    
+        a = valid_of_reg(operrand)
+        binaryd.write(struct.pack("<B", a))
+        a = valid_of_reg(operrand2)
+        binaryd.write(struct.pack("<B", a))
+        start()
+    elif incode == "PC":
+        PC_mem = int(operrand)    
+        start()
+    elif incode == "input":
+        number = struct.pack("<B", 0xF9)
+        binaryd.write(number)   
+        start()
     else:
-        start()        
+        if operrand == "=":
+            variable(incode, operrand2, operrand)     
+        else:
+            start()            
+def variable(name, data, oper):
+    global binaryd
+    global PC_mem, variable
+    if oper == "=":
+        if data in ascii_table:
+            data = ascii_table[data]
+        mem_for_variable[name] = [int(data), PC_mem]
+        print(mem_for_variable, PC_mem)
+        binaryd.write(struct.pack("<B", 0x20))
+        binaryd.write(struct.pack("<B", 0x00))
+        binaryd.write(struct.pack("<B", 0x00))
+        binaryd.write(struct.pack("<B", int(data)))
+        PC_mem += 1
+        switch("store", (PC_mem - 1), data)      
 #===================================        
 def start():
     ans = input(":")
