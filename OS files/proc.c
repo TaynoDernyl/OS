@@ -179,10 +179,6 @@ int main(int argc, char **argv) {
                         fprintf(stderr, "Invalid reg %u in LOAD\n", reg);
                         break;
                 }
-
-                if (trace) {
-                    printf("LOAD reg=%u [%04X]\n", reg, addr);
-                }
             } break;
 
 
@@ -215,10 +211,6 @@ int main(int argc, char **argv) {
                     default:
                         fprintf(stderr, "Invalid reg %u in STORE\n", reg);
                         break;
-                }
-
-                if (trace) {
-                    printf("STORE reg=%u mem[%04X]\n", reg, addr);
                 }
             } break;
 
