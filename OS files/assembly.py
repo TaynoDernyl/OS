@@ -24,7 +24,7 @@ ascii_table = {
 }
 #===================================
 mem_for_variable = {} #наши переменные
-PC_mem = 8
+PC_mem = 100
 #===================================
 def valid_of_reg(reg):
     if reg in table_of_reg:
@@ -106,6 +106,8 @@ except:
         binaryd = open("temp.bin", "wb+")
         print("автоматически создан временный файл")
 print("вы в файле:", file)  
+temp_file = os.path.splitext(file)[0] + ".ss"
+comandfile = open(temp_file, "a") 
 t.start()
 #=================================== 
 table_of_reg = {
@@ -222,8 +224,17 @@ def parse_number(s):
         return s
 #===================================
 def switch(incode, operrand, operrand2):
-    global file
-    global binaryd, PC_mem
+    global file, comandfile
+    global binaryd, PC_mem, mem_for_variable
+    
+    if operrand and operrand2 != 0:
+        comandfile.write(str(incode)+" ")
+        comandfile.write(str(operrand)+" ")
+        comandfile.write(str(operrand2)+" ")
+        comandfile.write('\n')
+    if incode == "f":
+        comandfile.write(str(incode)+" ")
+        comandfile.write('\n')
     binaryd.seek(0, 2)
     if incode == "open":
         file = input("напишите навзание файла для открытия(с .bin в конце для корректной работы):")
@@ -242,7 +253,6 @@ def switch(incode, operrand, operrand2):
                 binaryd.write(struct.pack("<B", a))
                 binaryd.write(struct.pack("<H", int(operrand)))
             else:
-                print(a)
                 print("будет записан регистр al")
                 binaryd.write(struct.pack("<B", 0x05))
                 binaryd.write(struct.pack("<B", 0x00))
@@ -269,10 +279,13 @@ def switch(incode, operrand, operrand2):
         if temp == "y" or temp == "Y" or temp == "yes":
             PC_mem = 8
             binaryd.truncate(0)
+            comandfile.truncate(0)
             print("удалено")
         else:
             print("отменено")
-        start()        
+        
+        start()      
+
     elif incode == "разослать":
         try:
             if operrand == "школе":
@@ -287,6 +300,9 @@ def switch(incode, operrand, operrand2):
     elif incode == "q":
         binaryd.seek(0, 2)
         stop_thread.set()
+        for name, (value, addr) in mem_for_variable.items():
+            comandfile.write("\n")
+            comandfile.write(f"{name}: value={value}, address={addr-1} ")
         t.join()
     elif incode == "comp":
         number = struct.pack("<B", 0xD0)
@@ -354,6 +370,9 @@ def switch(incode, operrand, operrand2):
         start() 
     elif incode == "r":
         read()
+        start()
+    elif incode == "var":
+        print(mem_for_variable)    
         start()
     elif incode == "jmp":
         number = struct.pack("<B", 0x0B)
@@ -483,19 +502,37 @@ def switch(incode, operrand, operrand2):
         else:
             start()            
 def variable(name, data, oper):
-    global binaryd
-    global PC_mem, variable
+    global binaryd, comandfile
+    global PC_mem, mem_for_variable
+    try:
+        data = int(data)
+    except:
+        pass
     if oper == "=":
-        if data in ascii_table:
-            data = ascii_table[data]
+        if isinstance(data, str):
+            data = ord(data)
+
+        # если переменная уже есть — берём старый адрес
+        if name in mem_for_variable:
+            PC_mem = mem_for_variable[name][1]
+        else:    
+            PC_mem += 1
+
         mem_for_variable[name] = [int(data), PC_mem]
-        print(mem_for_variable, PC_mem)
+
+        # Запись значения
         binaryd.write(struct.pack("<B", 0x20))
         binaryd.write(struct.pack("<B", 0x00))
         binaryd.write(struct.pack("<B", 0x00))
         binaryd.write(struct.pack("<B", int(data)))
-        PC_mem += 1
-        switch("store", (PC_mem - 1), data)      
+
+        comandfile.write("mov ")
+        comandfile.write("al ")
+        comandfile.write(str(data))
+        comandfile.write('\n')
+        
+        switch("store", (PC_mem - 1), data)
+
 #===================================        
 def start():
     ans = input(":")
