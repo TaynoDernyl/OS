@@ -5,28 +5,6 @@
 #include <conio.h>
 
 #define MEM_SIZE 65536   // <- исправлено: 2^16
-#define MOV 0x20
-#define NOP 0x00
-#define LOAD_A(x) 0x01, (uint8_t)(x) //загрузить сразу в регистр A
-#define LOAD_B(x) 0x02, (uint8_t)(x) //загрузить сращу в регистр В
-#define LOADMEM_A(addr) 0x03, (uint16_t)((addr) & 0xFF), (uint16_t)(((addr) >> 8) & 0xFF)
-#define LOADMEM_B(addr) 0x04, (uint16_t)((addr) & 0xFF), (uint16_t)(((addr) >> 8 )& 0xFF)
-#define STA(addr) 0x05, (uint16_t)((addr) & 0xFF), (uint16_t)(((addr) >> 8) & 0xFF)
-#define STB(addr) 0x06, (uint16_t)((addr) & 0xFF), (uint16_t)(((addr) >> 8) & 0xFF)
-#define SUB 0x07
-#define ADD 0x08
-#define INC 0x09
-#define DEC 0x0A
-#define JMP(addr) 0x0B, (uint8_t)((addr) & 0xFF), (uint8_t)(((addr) >> 8) & 0xFF)
-#define JZ(addr) 0x0C, (uint8_t)((addr) & 0xFF),  (uint8_t)(((addr) >> 8) & 0xFF)
-#define JNZ(addr) 0x0D, (uint8_t)((addr) & 0xFF),  (uint8_t)(((addr) >> 8) & 0xFF)
-#define PRINTAL 0x0E
-#define PRINTA 0xAE
-#define HLT 0xFF
-#define LDAL(x) 0xA1, (uint8_t)(x)
-#define LDAH(x) 0xA2, (uint8_t)(x)
-#define LDBL(x) 0xB1, (uint8_t)(x)
-#define LDBH(x) 0xB2, (uint8_t)(x)
 
 enum {
     REG_AL = 0,
@@ -45,6 +23,22 @@ typedef struct
     uint8_t Z;
 } CPU;
 
+static inline void sync_ax_from_al_ah(CPU *cpu) {
+    cpu->AX = ((uint16_t)cpu->AH << 8) | (uint16_t)cpu->AL;
+}
+static inline void sync_al_ah_from_ax(CPU *cpu) {
+    cpu->AL = cpu->AX & 0xFF;
+    cpu->AH = (cpu->AX >> 8) & 0xFF;
+}
+static inline void sync_bx_from_bl_bh(CPU *cpu) {
+    cpu->BX = ((uint16_t)cpu->BH << 8) | (uint16_t)cpu->BL;
+}
+static inline void sync_bl_bh_from_bx(CPU *cpu) {
+    cpu->BL = cpu->BX & 0xFF;
+    cpu->BH = (cpu->BX >> 8) & 0xFF;
+}
+
+
 static uint8_t mem[MEM_SIZE];
 
 static uint16_t rd16(uint16_t PC){ //читаем 16 битное число (безопасно по модулю MEM_SIZE)
@@ -53,19 +47,21 @@ static uint16_t rd16(uint16_t PC){ //читаем 16 битное число (б
     return (hi << 8) | lo;
 }
 
-static void setZ(CPU *cpu, uint16_t v) { cpu->Z = (v == 0); }
+static void setZ8(CPU *cpu, uint8_t v) { cpu->Z = (v == 0); }
+static void setZ16(CPU *cpu, uint16_t v) { cpu->Z = (v == 0); }
+
 
 static void load_binary(const char *path){
     FILE *f = fopen(path, "rb");
     if (!f) {perror("fopen"); exit(1);}
+    memset(mem, 0, MEM_SIZE);
     size_t n = fread(mem, 1, MEM_SIZE, f);  
     fclose(f);
     if (n == 0){fprintf(stderr, "empty\n"); exit(1);}
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {MOV,0x00,0x00,0x0F,0x05, REG_AL, 0x05, 0x00, // STORE AL в [0x0005]
-    0x04, REG_BL, 0x05, 0x00,0xFF};
+    uint8_t demo[] = {0x20, 0x00, 0x00, 0x0A, 0x05, 0x00, 0x09, 0x00, 0x04, 0x02, 0x09, 0x00, 0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -92,52 +88,54 @@ int main(int argc, char **argv) {
         }
         
         switch (op) {
-            case MOV: { 
+            case 0x20: {
                 uint8_t flags = mem[cpu.PC++ % MEM_SIZE];
                 uint8_t dst = mem[cpu.PC++ % MEM_SIZE];
                 uint8_t src = mem[cpu.PC++ % MEM_SIZE];
 
-                // debug: вывести считанные аргументы (удалить, если не нужно)
                 if (trace) printf("MOV flags=%u dst=%u src=%u\n", flags, dst, src);
-                
-                if (flags == 0) { // MOV 8-бит
+
+                if (flags == 0) { // 8-bit
                     uint8_t val = 0;
                     switch (src) {
                         case REG_AL: val = cpu.AL; break;
                         case REG_AH: val = cpu.AH; break;
                         case REG_BL: val = cpu.BL; break;
                         case REG_BH: val = cpu.BH; break;
-                        default:
-                            val = src;
-                            break; // пропускаем, не выходим из программы
+                        default:if (src <= REG_BX) {
+                                // это регистр
+                            } else {
+                                val = src; // это значение
+                            }
+                        break;
                     }
                     switch (dst) {
-                        case REG_AL: cpu.AL = val; break;
-                        case REG_AH: cpu.AH = val; break;
-                        case REG_BL: cpu.BL = val; break;
-                        case REG_BH: cpu.BH = val; break;
-                        default:
-                            fprintf(stderr, "Invalid 8-bit dst reg %u (flags=%u,src=%u)\n", dst, flags, src);
-                            break;
+                        case REG_AL: cpu.AL = val; sync_ax_from_al_ah(&cpu); break;
+                        case REG_AH: cpu.AH = val; sync_ax_from_al_ah(&cpu); break;
+                        case REG_BL: cpu.BL = val; sync_bx_from_bl_bh(&cpu); break;
+                        case REG_BH: cpu.BH = val; sync_bx_from_bl_bh(&cpu); break;
+                        default: fprintf(stderr, "Invalid 8-bit dst reg %u\n", dst); break;
                     }
-                } else { // MOV 16-бит
+                } else { // 16-bit
                     uint16_t val = 0;
                     switch (src) {
                         case REG_AX: val = cpu.AX; break;
                         case REG_BX: val = cpu.BX; break;
-                        default:
-                            val = src;
-                            break;
+                        default: if (src <= REG_BX) {
+                                // это регистр
+                            } else {
+                                val = src; // это значение
+                            }
+                        break;
                     }
                     switch (dst) {
-                        case REG_AX: cpu.AX = val; break;
-                        case REG_BX: cpu.BX = val; break;
-                        default:
-                            fprintf(stderr, "Invalid 16-bit dst reg %u (flags=%u,src=%u)\n", dst, flags, src);
-                            break;
+                        case REG_AX: cpu.AX = val; sync_al_ah_from_ax(&cpu); break;
+                        case REG_BX: cpu.BX = val; sync_bl_bh_from_bx(&cpu); break;
+                        default: fprintf(stderr, "Invalid 16-bit dst reg %u\n", dst); break;
                     }
                 }
             } break;
+
 
             case 0x00: /* NOP */ break;
 
@@ -149,36 +147,52 @@ int main(int argc, char **argv) {
                 switch (reg) {
                     case REG_AL:
                         cpu.AL = mem[addr % MEM_SIZE];
-                        setZ(&cpu, cpu.AL);
+                        setZ8(&cpu, cpu.AL);
+                        sync_ax_from_al_ah(&cpu);
                         break;
                     case REG_AH:
                         cpu.AH = mem[addr % MEM_SIZE];
-                        setZ(&cpu, cpu.AH);
+                        setZ8(&cpu, cpu.AH);
+                        sync_ax_from_al_ah(&cpu);
                         break;
                     case REG_BL:
                         cpu.BL = mem[addr % MEM_SIZE];
-                        setZ(&cpu, cpu.BL);
+                        setZ8(&cpu, cpu.BL);
+                        sync_bx_from_bl_bh(&cpu);
                         break;
                     case REG_BH:
                         cpu.BH = mem[addr % MEM_SIZE];
-                        setZ(&cpu, cpu.BH);
+                        setZ8(&cpu, cpu.BH);
+                        sync_bx_from_bl_bh(&cpu);
                         break;
                     case REG_AX: {
                         uint8_t lo = mem[addr % MEM_SIZE];
                         uint8_t hi = mem[(addr + 1) % MEM_SIZE];
                         cpu.AX = (hi << 8) | lo;
-                        setZ(&cpu, cpu.AX);
+                        setZ16(&cpu, cpu.AX);
+                        sync_al_ah_from_ax(&cpu);
                     } break;
                     case REG_BX: {
                         uint8_t lo = mem[addr % MEM_SIZE];
                         uint8_t hi = mem[(addr + 1) % MEM_SIZE];
                         cpu.BX = (hi << 8) | lo;
-                        setZ(&cpu, cpu.BX);
+                        setZ16(&cpu, cpu.BX);
+                        sync_bl_bh_from_bx(&cpu);
                     } break;
                     default:
                         fprintf(stderr, "Invalid reg %u in LOAD\n", reg);
                         break;
                 }
+                if (trace) {
+                    uint16_t pc_now = (cpu.PC-1) & 0xFFFF;
+                    printf(">> ENTER LOAD at PC=%04X raw next bytes: %02X %02X %02X\n",
+                        pc_now,
+                        mem[cpu.PC % MEM_SIZE],
+                        mem[(cpu.PC+1) % MEM_SIZE],
+                        mem[(cpu.PC+2) % MEM_SIZE]);
+                    fflush(stdout);
+                }
+
             } break;
 
 
@@ -212,6 +226,15 @@ int main(int argc, char **argv) {
                         fprintf(stderr, "Invalid reg %u in STORE\n", reg);
                         break;
                 }
+                if (trace) {
+                    uint16_t pc_now = (cpu.PC-1) & 0xFFFF;
+                    printf(">> ENTER STORE at PC=%04X raw next bytes: %02X %02X %02X\n",
+                        pc_now,
+                        mem[cpu.PC % MEM_SIZE],
+                        mem[(cpu.PC+1) % MEM_SIZE],
+                        mem[(cpu.PC+2) % MEM_SIZE]);
+                    fflush(stdout);
+                }
             } break;
 
 
@@ -229,14 +252,14 @@ int main(int argc, char **argv) {
                     case REG_AX:
                     {
                         if (oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
-                            printf("invalid operation:ADD 16 bit to 8 bit");
+                            printf("invalid operation:SUB 16 bit from 8 bit");
                         }
                         valid = 1;
                     }break;
                     case REG_BX:
                     {
                         if (oper1 == REG_AL || oper1 == REG_BL || oper1 == REG_AH || oper1 == REG_BH){
-                            printf("invalid operation:ADD 16 bit to 8 bit");
+                            printf("invalid operation:SUB 16 bit from 8 bit");
                         }
                         valid = 1;
                     }break;
@@ -246,12 +269,12 @@ int main(int argc, char **argv) {
                 }
                 if (valid == 0){
                 switch (oper1){
-                    case REG_AL: cpu.AL -= val; break;
-                    case REG_AH: cpu.AH -= val; break;
-                    case REG_BL: cpu.BL -= val; break;
-                    case REG_BH: cpu.BH -= val; break;     
-                    case REG_AX: cpu.AX -= val; break;       
-                    case REG_BX: cpu.BX -= val; break;    
+                    case REG_AL: cpu.AL -= val; setZ8(&cpu, cpu.AL); sync_ax_from_al_ah(&cpu); break;
+                    case REG_AH: cpu.AH -= val; setZ8(&cpu, cpu.AH); sync_ax_from_al_ah(&cpu); break;
+                    case REG_BL: cpu.BL -= val; setZ8(&cpu, cpu.BL); sync_bx_from_bl_bh(&cpu); break;
+                    case REG_BH: cpu.BH -= val; setZ8(&cpu, cpu.BH); sync_bx_from_bl_bh(&cpu); break;     
+                    case REG_AX: cpu.AX -= val; setZ16(&cpu, cpu.AX); sync_al_ah_from_ax(&cpu); break;       
+                    case REG_BX: cpu.BX -= val; setZ16(&cpu, cpu.BX); sync_bl_bh_from_bx(&cpu); break;    
                 default:
                     printf("invalid reg");
                     break;
@@ -289,12 +312,12 @@ int main(int argc, char **argv) {
                 }
                 if (valid == 0){
                 switch (oper1){
-                    case REG_AL: cpu.AL += val; break;
-                    case REG_AH: cpu.AH += val; break;
-                    case REG_BL: cpu.BL += val; break;
-                    case REG_BH: cpu.BH += val; break;
-                    case REG_AX: cpu.AX += val; break;       
-                    case REG_BX: cpu.BX += val; break;    
+                    case REG_AL: cpu.AL += val; setZ8(&cpu, cpu.AL); sync_ax_from_al_ah(&cpu); break;
+                    case REG_AH: cpu.AH += val; setZ8(&cpu, cpu.AH); sync_ax_from_al_ah(&cpu); break;
+                    case REG_BL: cpu.BL += val; setZ8(&cpu, cpu.BL); sync_bx_from_bl_bh(&cpu); break;
+                    case REG_BH: cpu.BH += val; setZ8(&cpu, cpu.BH); sync_bx_from_bl_bh(&cpu); break;     
+                    case REG_AX: cpu.AX += val; setZ16(&cpu, cpu.AX); sync_al_ah_from_ax(&cpu); break;       
+                    case REG_BX: cpu.BX += val; setZ16(&cpu, cpu.BX); sync_bl_bh_from_bx(&cpu); break;       
                 default:
                     printf("invalid reg");
                     break;
@@ -305,12 +328,12 @@ int main(int argc, char **argv) {
             case 0x09:{ // INC
             uint8_t reg = mem[cpu.PC++ % MEM_SIZE];
             switch(reg){
-                case REG_AL: cpu.AL++; setZ(&cpu, cpu.AL); break;
-                case REG_AH: cpu.AH++; setZ(&cpu, cpu.AH); break;
-                case REG_BL: cpu.BL++; setZ(&cpu, cpu.BL); break;
-                case REG_BH: cpu.BH++; setZ(&cpu, cpu.BH); break;
-                case REG_AX: cpu.AX++; setZ(&cpu, (uint8_t)cpu.AX); break;
-                case REG_BX: cpu.BX++; setZ(&cpu, (uint8_t)cpu.BX); break;
+                case REG_AL: cpu.AL++; setZ8(&cpu, cpu.AL); sync_ax_from_al_ah(&cpu); break;
+                case REG_AH: cpu.AH++; setZ8(&cpu, cpu.AH); sync_ax_from_al_ah(&cpu); break;
+                case REG_BL: cpu.BL++; setZ8(&cpu, cpu.BL); sync_bx_from_bl_bh(&cpu); break;
+                case REG_BH: cpu.BH++; setZ8(&cpu, cpu.BH); sync_bx_from_bl_bh(&cpu); break;     
+                case REG_AX: cpu.AX++; setZ16(&cpu, cpu.AX); sync_al_ah_from_ax(&cpu); break;       
+                case REG_BX: cpu.BX++; setZ16(&cpu, cpu.BX); sync_bl_bh_from_bx(&cpu); break;    
                 default: fprintf(stderr, "Invalid reg %u in INC\n", reg); exit(1);
                 }
             } break;
@@ -318,12 +341,12 @@ int main(int argc, char **argv) {
             case 0x0A:{ // DEC
             uint8_t reg = mem[cpu.PC++ % MEM_SIZE];
             switch(reg){
-                case REG_AL: cpu.AL--; setZ(&cpu, cpu.AL); break;
-                case REG_AH: cpu.AH--; setZ(&cpu, cpu.AH); break;
-                case REG_BL: cpu.BL--; setZ(&cpu, cpu.BL); break;
-                case REG_BH: cpu.BH--; setZ(&cpu, cpu.BH); break;
-                case REG_AX: cpu.AX--; setZ(&cpu, (uint8_t)cpu.AX); break;
-                case REG_BX: cpu.BX--; setZ(&cpu, (uint8_t)cpu.BX); break;
+                case REG_AL: cpu.AL--; setZ8(&cpu, cpu.AL); sync_ax_from_al_ah(&cpu); break;
+                case REG_AH: cpu.AH--; setZ8(&cpu, cpu.AH); sync_ax_from_al_ah(&cpu); break;
+                case REG_BL: cpu.BL--; setZ8(&cpu, cpu.BL); sync_bx_from_bl_bh(&cpu); break;
+                case REG_BH: cpu.BH--; setZ8(&cpu, cpu.BH); sync_bx_from_bl_bh(&cpu); break;     
+                case REG_AX: cpu.AX--; setZ16(&cpu, cpu.AX); sync_al_ah_from_ax(&cpu); break;       
+                case REG_BX: cpu.BX--; setZ16(&cpu, cpu.BX); sync_bl_bh_from_bx(&cpu); break;    
                 default: fprintf(stderr, "Invalid reg %u in INC\n", reg); exit(1);
                 }
             } break;
@@ -348,6 +371,7 @@ int main(int argc, char **argv) {
 
             case 0xF9:{ //input
                 cpu.AL = getch();
+                sync_ax_from_al_ah(&cpu);
             } break;
             
             case 0xD0: { // CMP reg1, reg2
