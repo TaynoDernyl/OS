@@ -24,7 +24,10 @@ ascii_table = {
 }
 #===================================
 mem_for_variable = {} #наши переменные
-PC_mem = 100
+PC_mem = 4096
+
+#===================================
+do_start = True
 #===================================
 def valid_of_reg(reg):
     if reg in table_of_reg:
@@ -33,7 +36,7 @@ def valid_of_reg(reg):
         return -1
 #===================================
 def mov(op1, op2):
-    if op1 == "ax" or op1 == "bx":
+    if op1 in bit16_registers:
         flag = 1
     else:
         flag = 0
@@ -43,22 +46,7 @@ def mov(op1, op2):
                 op2 = table_of_reg[op2]
             else:
                 op2 = int(op2)
-            try:
-                binaryd.write(struct.pack("<B", 0x20))
-                binaryd.write(struct.pack("<B", flag))
-                binaryd.write(struct.pack("<B", op1))
-                binaryd.write(struct.pack("<B", op2))
-                return 0
-            except:
-                print("ошибка 1")
-                return 1
-    else:
-            op1 = int(op1)
-            if op1 >= 0 and op1 <=7:
-                if op2 in table_of_reg:
-                    op2 = table_of_reg[op2]
-                else:
-                    op2 = int(op2)    
+            if flag == 0 :    
                 try:
                     binaryd.write(struct.pack("<B", 0x20))
                     binaryd.write(struct.pack("<B", flag))
@@ -66,8 +54,45 @@ def mov(op1, op2):
                     binaryd.write(struct.pack("<B", op2))
                     return 0
                 except:
-                    print("ошибка 2")
+                    print("ошибка 1")
                     return 1
+            if flag == 1 :    
+                try:
+                    binaryd.write(struct.pack("<B", 0x20))
+                    binaryd.write(struct.pack("<B", flag))
+                    binaryd.write(struct.pack("<B", op1))
+                    binaryd.write(struct.pack("<H", op2))
+                    return 0
+                except:
+                    print("ошибка 1")
+                    return 1    
+    else:
+            op1 = int(op1)
+            if op1 >= 0 and op1 <=7:
+                if op2 in table_of_reg:
+                    op2 = table_of_reg[op2]
+                else:
+                    op2 = int(op2)   
+                if flag == 0: 
+                    try:
+                        binaryd.write(struct.pack("<B", 0x20))
+                        binaryd.write(struct.pack("<B", flag))
+                        binaryd.write(struct.pack("<B", op1))
+                        binaryd.write(struct.pack("<B", op2))
+                        return 0
+                    except:
+                        print("ошибка 2")
+                        return 1
+                if flag == 1: 
+                    try:
+                        binaryd.write(struct.pack("<B", 0x20))
+                        binaryd.write(struct.pack("<B", flag))
+                        binaryd.write(struct.pack("<B", op1))
+                        binaryd.write(struct.pack("<H", op2))
+                        return 0
+                    except:
+                        print("ошибка 2")
+                        return 1    
             else:    
                 print("введен неверный регистр!")
                 return 1
@@ -106,7 +131,7 @@ except:
         binaryd = open("temp.bin", "wb+")
         print("автоматически создан временный файл")
 print("вы в файле:", file)  
-temp_file = os.path.splitext(file)[0] + ".ss"
+temp_file = os.path.splitext(file)[0] + ".swg"
 comandfile = open(temp_file, "a") 
 t.start()
 #=================================== 
@@ -131,8 +156,12 @@ registers = {
     "BL": 0,
     "BH": 0,
     "AX": 0,
-    "BX": 0
+    "BX": 0,
+    "DS": 4096,
+    "CS": 0
 }
+
+bit16_registers = ("ax", "bx", "cs", "ds")
 #===================================
 def save_out():
     try:
@@ -224,7 +253,7 @@ def parse_number(s):
         return s
 #===================================
 def switch(incode, operrand, operrand2):
-    global file, comandfile
+    global file, comandfile, do_start
     global binaryd, PC_mem, mem_for_variable
     
     if operrand and operrand2 != 0:
@@ -259,7 +288,7 @@ def switch(incode, operrand, operrand2):
                 binaryd.write(struct.pack("<H", int(operrand)))
         except:
             print("ошибка записи!")    
-        start()    
+        return
     elif incode == "load":
         try:
             a = valid_of_reg(operrand)
@@ -272,12 +301,12 @@ def switch(incode, operrand, operrand2):
                 print("ошибка регистра!")
         except:
             print("ошибка записи!")    
-        start()    
+        return
     elif incode == "clear":
         print("уверен?")
         temp = input("y/n:")
         if temp == "y" or temp == "Y" or temp == "yes":
-            PC_mem = 8
+            PC_mem = registers["DS"]
             binaryd.truncate(0)
             comandfile.truncate(0)
             print("удалено")
@@ -300,9 +329,18 @@ def switch(incode, operrand, operrand2):
     elif incode == "q":
         binaryd.seek(0, 2)
         stop_thread.set()
-        for name, (value, addr) in mem_for_variable.items():
+        for name, value in mem_for_variable.items():
             comandfile.write("\n")
-            comandfile.write(f"{name}: value={value}, address={addr-1} ")
+            # если обычная переменная: [value, addr]
+            if isinstance(value[0], int):
+                val, addr = value
+                comandfile.write(f"{name}: value={val}, address={addr-1}")
+            # если строка (список списков)
+            else:
+                comandfile.write(f"{name}: ")
+                for val, addr in value:
+                    comandfile.write(f"(value={val}, addr={addr-1}) ")
+        do_start = False    
         t.join()
     elif incode == "comp":
         number = struct.pack("<B", 0xD0)
@@ -324,10 +362,10 @@ def switch(incode, operrand, operrand2):
     elif incode == "mov":
         try:
             mov(operrand, operrand2)
-            start()
+            
         except:
             print("ошибка")
-            start()    
+        return     
         
     elif incode == "si":
         if input("вы уверены?y/n:") == "y":
@@ -464,7 +502,7 @@ def switch(incode, operrand, operrand2):
             temp1 = operrand2
             number = struct.pack("<B", temp1)
             binaryd.write(number)  
-        start() 
+        return
     elif incode == "inc":
         number = struct.pack("<B", 0x09)
         binaryd.write(number)    
@@ -500,39 +538,64 @@ def switch(incode, operrand, operrand2):
         if operrand == "=":
             variable(incode, operrand2, operrand)     
         else:
-            start()            
+            pass
+        start()               
 def variable(name, data, oper):
     global binaryd, comandfile
     global PC_mem, mem_for_variable
+
     try:
         data = int(data)
     except:
         pass
+
     if oper == "=":
         if isinstance(data, str):
-            data = ord(data)
+            # одиночный символ
+            if len(data) == 1:
+                value = ord(data)
+                if name in mem_for_variable:
+                    PC_mem = mem_for_variable[name][1]
+                else:
+                    PC_mem += 1
 
-        # если переменная уже есть — берём старый адрес
-        if name in mem_for_variable:
-            PC_mem = mem_for_variable[name][1]
-        else:    
+                mem_for_variable[name] = [value, PC_mem]
+                switch("mov", "al", value)
+                switch("store", PC_mem, value)
+                PC_mem += 1
+                return
+
+            # строка
+            else:
+                if name not in mem_for_variable:
+                    mem_for_variable[name] = []
+
+                for ch in data:
+                    value = ord(ch)
+                    switch("mov", "al", value)
+                    switch("store", PC_mem, value)
+                    mem_for_variable[name].append([value, PC_mem])
+                    PC_mem += 1
+                    print(PC_mem)
+                switch("sub", "al", "al")
+                switch("store", PC_mem, "al")    
+                mem_for_variable[name].append([0, PC_mem])
+                PC_mem += 1
+                return
+                
+
+        # число
+        else:
+            if name in mem_for_variable:
+                PC_mem = mem_for_variable[name][1]
+            else:
+                PC_mem += 1
+
+            mem_for_variable[name] = [int(data), PC_mem]
+            switch("mov", "al", int(data))
+            switch("store", PC_mem, int(data))
             PC_mem += 1
-
-        mem_for_variable[name] = [int(data), PC_mem]
-
-        # Запись значения
-        binaryd.write(struct.pack("<B", 0x20))
-        binaryd.write(struct.pack("<B", 0x00))
-        binaryd.write(struct.pack("<B", 0x00))
-        binaryd.write(struct.pack("<B", int(data)))
-
-        comandfile.write("mov ")
-        comandfile.write("al ")
-        comandfile.write(str(data))
-        comandfile.write('\n')
-        
-        switch("store", (PC_mem - 1), data)
-
+    return
 #===================================        
 def start():
     ans = input(":")
@@ -545,6 +608,7 @@ def start():
     if len(parts) > 2:
         opperand2 = parts[2]    
     switch(command, opperand, opperand2)   
+    while do_start:
+        start()
 #===================================
-
 start()    
