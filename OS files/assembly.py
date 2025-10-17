@@ -113,7 +113,7 @@ def auto_save():
 t = threading.Thread(target=auto_save)  
 stop_thread = threading.Event()  
 #===================================
-print("> BOOT LETOS SYSTEM v0.0.3...\n===================\n|Start your work:)|\n===================")
+print("> BOOT LETOS INTERPRETATOR v0.0.3\n===================\n|Start your work:)|\n===================")
 file = input("напишите навзание файла для открытия:")
 if file == "q":
         do_start = False
