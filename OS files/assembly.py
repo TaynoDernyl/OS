@@ -569,8 +569,9 @@ def variable(name, data, oper):
         pass
 
     if oper == "=":
-        if isinstance(data, str):
+        if isinstance(data, str) or data > 255:
             # одиночный символ
+            data = str(data)
             if len(data) == 1:
                 value = ord(data)
                 if name in mem_for_variable:
