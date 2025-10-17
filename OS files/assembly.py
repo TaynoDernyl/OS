@@ -28,6 +28,7 @@ PC_mem = 4096
 
 #===================================
 do_start = True
+new_project = False
 #===================================
 def valid_of_reg(reg):
     if reg in table_of_reg:
@@ -112,28 +113,46 @@ def auto_save():
 t = threading.Thread(target=auto_save)  
 stop_thread = threading.Event()  
 #===================================
+print("> BOOT LETOS SYSTEM v0.0.3...\n===================\n|Start your work:)|\n===================")
 file = input("напишите навзание файла для открытия:")
-try:
-    if file.endswith(".bin"):
-        binaryd = open(file, "r+b")
-    else:
-        file = (file + ".bin")    
-        binaryd = open(file, "r+b")
-except:
-    if (input("такого файла нет, хотите создать?y/n:")) == "y":
+if file == "q":
+        do_start = False
+else:        
+    print("Trying to create file..")
+    try:
         if file.endswith(".bin"):
-            binaryd = open(file, "wb+")
+            binaryd = open(file, "r+b")
         else:
             file = (file + ".bin")    
-            binaryd = open(file, "wb+")
-    else:        
-        file = "temp.bin"
-        binaryd = open("temp.bin", "wb+")
-        print("автоматически создан временный файл")
-print("вы в файле:", file)  
-temp_file = os.path.splitext(file)[0] + ".swg"
-comandfile = open(temp_file, "a") 
-t.start()
+            binaryd = open(file, "r+b")
+        print("Complite!")    
+    except:
+        if (input("такого файла нет, хотите создать?y/n:")) == "y":
+            if file.endswith(".bin"):
+                binaryd = open(file, "wb+")
+            else:
+                file = (file + ".bin")    
+                binaryd = open(file, "wb+")
+            print("Complite!")    
+        else:        
+            print("Creating temp file..")
+            file = "temp.bin"
+            binaryd = open("temp.bin", "wb+")
+            print("Complite!")
+    print("Work with .swg file..")        
+    new_file = input("вы хотите очистить данные(все данные с файла .swg сотрутся)y/n:")   
+    if new_file == "y" or new_file == "yes":
+        new_project = True   
+    print("вы в файле:", file)  
+    if new_project == False:
+        temp_file = os.path.splitext(file)[0] + ".swg"
+        comandfile = open(temp_file, "a") 
+    else:
+        temp_file = os.path.splitext(file)[0] + ".swg"
+        comandfile = open(temp_file, "w+")  
+        new_project = False
+    print("Complite!")    
+    t.start()
 #=================================== 
 table_of_reg = {
     "AL": 0,
@@ -262,7 +281,7 @@ def switch(incode, operrand, operrand2):
         comandfile.write(str(operrand2)+" ")
         comandfile.write('\n')
     if incode == "f":
-        comandfile.write(str(incode)+" ")
+        comandfile.write("stop")
         comandfile.write('\n')
     binaryd.seek(0, 2)
     if incode == "open":
@@ -611,4 +630,5 @@ def start():
     while do_start:
         start()
 #===================================
-start()    
+if do_start:
+    start()    
