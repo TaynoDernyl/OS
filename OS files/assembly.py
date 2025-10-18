@@ -469,7 +469,7 @@ def switch(incode, operrand, operrand2):
         if input("вы уверены?y/n:") == "y":
             try:
                 binaryd.seek(0)
-                save = input("в какой файл сохранить?(.bin в конце для корректной работы)")
+                save = input("в какой файл сохранить?(.bin в конце для корректной работы):")
                 try:
                     binsave = open(save, "wb+")
                     binsave.write(binaryd.read())
