@@ -3,6 +3,7 @@ import keyboard
 import threading 
 import os
 import time
+import sys 
 #===================================
 ascii_table = {
     0: 'NUL', 1: 'SOH', 2: 'STX', 3: 'ETX', 4: 'EOT', 5: 'ENQ', 6: 'ACK', 7: 'BEL',
@@ -25,7 +26,7 @@ ascii_table = {
 #===================================
 mem_for_variable = {} #наши переменные
 PC_mem = 4096
-
+valid_save = True
 #===================================
 do_start = True
 new_project = False
@@ -33,6 +34,8 @@ new_project = False
 def valid_of_reg(reg):
     if reg in table_of_reg:
         return table_of_reg[reg]
+    elif reg >= 0 and reg < 8:
+        return reg
     else:
         return -1
 #===================================
@@ -59,6 +62,25 @@ def mov(op1, op2):
                     return 1
             if flag == 1 :    
                 try:
+                    print(op1)
+                    if op1 == 6:
+                        print(op2)
+                        if not op2 >= 0 and op2 <= 7:
+                            registers["DS"] = op2
+                            return 0
+                        else:
+                            print("Failed!")
+                            print("Загрузка сегментных регистров недоступна из других регистров")    
+                            return -1
+                    if op1 == 7:
+                        print(op2)
+                        if not op2 >= 0 and op2 <= 7:
+                            registers["CS"] = op2
+                            return 0
+                        else:
+                            print("Failed!")
+                            print("Загрузка сегментных регистров недоступна из других регистров")    
+                            return -1    
                     binaryd.write(struct.pack("<B", 0x20))
                     binaryd.write(struct.pack("<B", flag))
                     binaryd.write(struct.pack("<B", op1))
@@ -86,6 +108,13 @@ def mov(op1, op2):
                         return 1
                 if flag == 1: 
                     try:
+                        if op1 == 6:
+                            if valid_of_reg(op2) != -1:
+                                registers["DS"] = op2
+                            else:
+                                print("Failed!")
+                                print("Загрузка сегментных регистров недоступна из других регистров")    
+                                return -1
                         binaryd.write(struct.pack("<B", 0x20))
                         binaryd.write(struct.pack("<B", flag))
                         binaryd.write(struct.pack("<B", op1))
@@ -99,6 +128,7 @@ def mov(op1, op2):
                 return 1
 #===================================
 def auto_save():
+    global valid_save
     while not stop_thread.is_set():
         if stop_thread.wait(60):
             break
@@ -108,6 +138,7 @@ def auto_save():
             save_out_file = binaryd.read()
             temp_save.write(save_out_file)
             binaryd.seek(0, 2)
+            valid_save = True
         except:
             print("ошибка?")    
 t = threading.Thread(target=auto_save)  
@@ -115,10 +146,11 @@ stop_thread = threading.Event()
 #===================================
 print("> BOOT LETOS INTERPRETATOR v0.0.3\n===================\n|Start your work:)|\n===================")
 file = input("напишите навзание файла для открытия:")
+print("Trying to create file..")
 if file == "q":
         do_start = False
-else:        
-    print("Trying to create file..")
+        print("Failed")
+else:           
     try:
         if file.endswith(".bin"):
             binaryd = open(file, "r+b")
@@ -127,6 +159,7 @@ else:
             binaryd = open(file, "r+b")
         print("Complite!")    
     except:
+        print("Failed")
         if (input("такого файла нет, хотите создать?y/n:")) == "y":
             if file.endswith(".bin"):
                 binaryd = open(file, "wb+")
@@ -151,7 +184,9 @@ else:
         temp_file = os.path.splitext(file)[0] + ".swg"
         comandfile = open(temp_file, "w+")  
         new_project = False
-    print("Complite!")    
+    print("Ready for work!")    
+    comandfile.write("===================")
+    comandfile.write("\n")
     t.start()
 #=================================== 
 table_of_reg = {
@@ -166,7 +201,11 @@ table_of_reg = {
     "bl": 2,
     "bh": 3,
     "ax": 4,
-    "bx": 5
+    "bx": 5,
+    "DS": 6,
+    "ds": 6,
+    "CS": 7,
+    "cs": 7
 }
 
 registers = {
@@ -185,7 +224,7 @@ bit16_registers = ("ax", "bx", "cs", "ds")
 def save_out():
     try:
         temp = open(file, "wb+")
-        save = input("откуда сохранить?(название через bin):")
+        save = input("откуда сохранить?(название через .bin):")
         try:
             code = open(save, "rb")
             data = code.read()
@@ -272,7 +311,7 @@ def parse_number(s):
         return s
 #===================================
 def switch(incode, operrand, operrand2):
-    global file, comandfile, do_start
+    global file, comandfile, do_start, valid_save
     global binaryd, PC_mem, mem_for_variable
     
     if operrand and operrand2 != 0:
@@ -294,27 +333,32 @@ def switch(incode, operrand, operrand2):
         print("вы в файле:", file)  
         start()
     elif incode == "store":
+        valid_save = False
         try:
             a = valid_of_reg(operrand2)
             if a >= 0:
                 binaryd.write(struct.pack("<B", 0x05))
                 binaryd.write(struct.pack("<B", a))
-                binaryd.write(struct.pack("<H", int(operrand)))
+                binaryd.write(struct.pack("<H", int(operrand)+registers["DS"]))
+                PC_mem += 1
             else:
                 print("будет записан регистр al")
                 binaryd.write(struct.pack("<B", 0x05))
                 binaryd.write(struct.pack("<B", 0x00))
-                binaryd.write(struct.pack("<H", int(operrand)))
+                binaryd.write(struct.pack("<H", int(operrand)+registers["DS"]))
+                PC_mem += 1
         except:
             print("ошибка записи!")    
         return
     elif incode == "load":
+        valid_save = False
         try:
             a = valid_of_reg(operrand)
             if a >= 0:
                 binaryd.write(struct.pack("<B", 0x04))
                 binaryd.write(struct.pack("<B", a))
-                binaryd.write(struct.pack("<H", int(operrand2)))
+                binaryd.write(struct.pack("<H", int(operrand2)+registers["DS"]))
+                PC_mem += 1
             else:
                 print(a)
                 print("ошибка регистра!")
@@ -322,18 +366,19 @@ def switch(incode, operrand, operrand2):
             print("ошибка записи!")    
         return
     elif incode == "clear":
+        valid_save = False
         print("уверен?")
         temp = input("y/n:")
         if temp == "y" or temp == "Y" or temp == "yes":
             PC_mem = registers["DS"]
             binaryd.truncate(0)
-            comandfile.truncate(0)
+            comandfile.close()
+            comandfile = open(temp_file, "w+")
+            comandfile.write("===================\n")
             print("удалено")
         else:
             print("отменено")
-        
         start()      
-
     elif incode == "разослать":
         try:
             if operrand == "школе":
@@ -348,6 +393,7 @@ def switch(incode, operrand, operrand2):
     elif incode == "q":
         binaryd.seek(0, 2)
         stop_thread.set()
+        print("Thank you for using Letos;)")
         for name, value in mem_for_variable.items():
             comandfile.write("\n")
             # если обычная переменная: [value, addr]
@@ -359,13 +405,12 @@ def switch(incode, operrand, operrand2):
                 comandfile.write(f"{name}: ")
                 for val, addr in value:
                     comandfile.write(f"(value={val}, addr={addr-1}) ")
+        comandfile.write("\n")            
+        comandfile.write("===================")            
         do_start = False    
         t.join()
-    elif incode == "comp":
-        number = struct.pack("<B", 0xD0)
-        binaryd.write(number)
-        start()
-    elif incode == "f":
+    elif incode == "f" or incode == "stop":
+        valid_save = False
         number = struct.pack("<B", 0xFF)
         binaryd.write(number)
         start()
@@ -379,18 +424,21 @@ def switch(incode, operrand, operrand2):
             print("неизвестная ошибка")
             start()   
     elif incode == "mov":
+        valid_save = False
         try:
-            mov(operrand, operrand2)
-            
+            prost = mov(operrand, operrand2)
+            if prost == -1:
+                comandfile.write("Failed operation!")
+                comandfile.write("\n")
         except:
             print("ошибка")
-        return     
-        
+        return         
     elif incode == "si":
+        valid_save = True
         if input("вы уверены?y/n:") == "y":
             try:
                 binaryd.seek(0)
-                save = input("в какой файл сохранить?")
+                save = input("в какой файл сохранить?(.bin в конце для корректной работы)")
                 try:
                     binsave = open(save, "wb+")
                     binsave.write(binaryd.read())
@@ -407,6 +455,7 @@ def switch(incode, operrand, operrand2):
             print("изменения не сохранены")
             start()    
     elif incode == "so":
+        valid_save = True
         if input("вы уверены?y/n:") == "y":
             result = save_out()
             if result == 1:
@@ -421,6 +470,7 @@ def switch(incode, operrand, operrand2):
             print("изменения не сохранены")
             start()   
     elif incode == "b":
+        valid_save = False
         binaryd.seek(0, 2)
         size = binaryd.tell()
         binaryd.truncate(size -1)
@@ -432,24 +482,28 @@ def switch(incode, operrand, operrand2):
         print(mem_for_variable)    
         start()
     elif incode == "jmp":
+        valid_save = False
         number = struct.pack("<B", 0x0B)
         binaryd.write(number)
         number = struct.pack("<H", operrand)
         binaryd.write(number)
         start()
     elif incode == "jz":
+        valid_save = False
         number = struct.pack("<B", 0x0C)
         binaryd.write(number)
         number = struct.pack("<H", operrand)
         binaryd.write(number)
         start()
     elif incode == "jnz":
+        valid_save = False
         number = struct.pack("<B", 0x0D)
         binaryd.write(number)
         number = struct.pack("<H", operrand)
         binaryd.write(number)
         start()
     elif incode == "add":
+        valid_save = False
         if operrand in table_of_reg:
             number = struct.pack("<B", 0x08)
             binaryd.write(number)    
@@ -487,6 +541,7 @@ def switch(incode, operrand, operrand2):
 
         start()
     elif incode == "sub":
+        valid_save = False
         if operrand in table_of_reg:
             number = struct.pack("<B", 0x07)
             binaryd.write(number)    
@@ -523,22 +578,26 @@ def switch(incode, operrand, operrand2):
             binaryd.write(number)  
         return
     elif incode == "inc":
+        valid_save = False
         number = struct.pack("<B", 0x09)
         binaryd.write(number)    
         a = valid_of_reg(operrand)
         binaryd.write(struct.pack("<B", a))
         start()    
     elif incode == "dec":
+        valid_save = False
         number = struct.pack("<B", 0x0A)
         binaryd.write(number)    
         a = valid_of_reg(operrand)
         binaryd.write(struct.pack("<B", a))
         start()    
     elif incode == "print":
+        valid_save = False
         number = struct.pack("<B", 0x0E)
         binaryd.write(number)    
         start()            
     elif incode == "comp":
+        valid_save = False
         number = struct.pack("<B", 0xD0)
         binaryd.write(number)    
         a = valid_of_reg(operrand)
@@ -547,9 +606,11 @@ def switch(incode, operrand, operrand2):
         binaryd.write(struct.pack("<B", a))
         start()
     elif incode == "PC":
+        switch("mov", "ds", int(operrand))
         PC_mem = int(operrand)    
         start()
     elif incode == "input":
+        valid_save = False
         number = struct.pack("<B", 0xF9)
         binaryd.write(number)   
         start()
@@ -618,7 +679,11 @@ def variable(name, data, oper):
     return
 #===================================        
 def start():
-    ans = input(":")
+    global valid_save
+    if valid_save == True:
+        ans = input("---:")
+    else:
+        ans = input("***:")
     parts = ans.split()
     command = parts[0] if parts else """"""
     opperand = 0
