@@ -27,6 +27,27 @@ ascii_table = {
 mem_for_variable = {} #наши переменные
 PC_mem = 4096
 valid_save = True
+def load_variables_from_file(comandfile):
+    global mem_for_variable
+    with open(comandfile, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or ":" not in line:
+                continue  # пропускаем пустые строки и мусор
+
+            name, rest = line.split(":", 1)
+            name = name.strip()
+
+            pairs = []
+            # ищем все пары вида (value=число, addr=число)
+            import re
+            matches = re.findall(r"\(value=(\d+), addr=(\d+)\)", rest)
+            for val, addr in matches:
+                pairs.append([int(val), int(addr)])
+
+            mem_for_variable[name] = pairs
+
+    return mem_for_variable
 #===================================
 do_start = True
 new_project = False
@@ -34,7 +55,7 @@ new_project = False
 def valid_of_reg(reg):
     if reg in table_of_reg:
         return table_of_reg[reg]
-    elif reg >= 0 and reg < 8:
+    elif reg >= 0 and reg < 7:
         return reg
     else:
         return -1
@@ -58,6 +79,7 @@ def mov(op1, op2):
                     binaryd.write(struct.pack("<B", op2))
                     return 0
                 except:
+                    print(flag, op1, op2)
                     print("ошибка 1")
                     return 1
             if flag == 1 :    
@@ -180,6 +202,9 @@ else:
     if new_project == False:
         temp_file = os.path.splitext(file)[0] + ".swg"
         comandfile = open(temp_file, "a") 
+        load_variables_from_file(temp_file)
+        PC_mem = max(addr for values in mem_for_variable.values() for _, addr in values)
+        print(PC_mem)
     else:
         temp_file = os.path.splitext(file)[0] + ".swg"
         comandfile = open(temp_file, "w+")  
@@ -323,6 +348,10 @@ def switch(incode, operrand, operrand2):
     if incode == "f":
         comandfile.write("stop")
         comandfile.write('\n')
+    elif incode == "input":
+        comandfile.write("input\n")    
+    elif incode == "print":
+        comandfile.write("print\n")    
     binaryd.seek(0, 2)
     if incode == "open":
         file = input("напишите навзание файла для открытия(с .bin в конце для корректной работы):")
@@ -334,7 +363,7 @@ def switch(incode, operrand, operrand2):
         print("вы в файле:", file)  
         start()
     elif incode == "help":
-        print("""open — открывает бинарный файл для работы, если не существует — создаёт новый temp.bin.\n
+        print("""               open — открывает бинарный файл для работы, если не существует — создаёт новый temp.bin.\n
             store — сохраняет значение регистра (или AL по умолчанию) в память по адресу.\n
             load — загружает значение из памяти в регистр.\n
             clear — очищает файлы программы (удаляет содержимое и пишет шапку).\n
@@ -360,6 +389,7 @@ def switch(incode, operrand, operrand2):
             PC — устанавливает указатель памяти PC_mem и сегмент данных DS.\n
             input — записывает команду ожидания пользовательского ввода.\n
             a = b - создание переменной.\n
+            a *символ в переменной* *регистр* - загружает определенный символ с переменной в регистр(счет символов начинается с 0)
             ---: - файл сохранен.\n
             ***: - файл не сохранен.\n""")
         return    
@@ -430,12 +460,12 @@ def switch(incode, operrand, operrand2):
             # если обычная переменная: [value, addr]
             if isinstance(value[0], int):
                 val, addr = value
-                comandfile.write(f"{name}: value={val}, address={addr-1}")
+                comandfile.write(f"{name}: value={val}, address={addr}")
             # если строка (список списков)
             else:
                 comandfile.write(f"{name}: ")
                 for val, addr in value:
-                    comandfile.write(f"(value={val}, addr={addr-1}) ")
+                    comandfile.write(f"(value={val}, addr={addr}) ")
         comandfile.write("\n")            
         comandfile.write("===================")            
         do_start = False    
@@ -640,11 +670,43 @@ def switch(incode, operrand, operrand2):
         switch("mov", "ds", int(operrand))
         PC_mem = int(operrand)    
         start()
-    elif incode == "input":
+    elif incode == "input":   
         valid_save = False
         number = struct.pack("<B", 0xF9)
         binaryd.write(number)   
         start()
+    elif incode in mem_for_variable:
+        try:
+            operrand = int(operrand)
+        except:
+            pass   
+        if valid_of_reg(operrand2) >= 0:  
+            if isinstance(operrand, str):
+                print("Failed!")
+                print("символ указывается только определенным числом, не регистром!")
+                return -1
+            else:
+                try:
+                    switch("mov", operrand2, mem_for_variable[incode][0][operrand])
+                except:
+                    print("Failed!")
+                    print("Ошибка загрузки символа в регистр!")   
+                    return -1        
+        else:
+            print("Failed!")
+            print("неизвестный регистр, будет использоваться регистр al")    
+            if isinstance(operrand, str):
+                print("Failed!")
+                print("символ указывается только определенным числом, не регистром!")
+                return -1
+            else:
+                try:
+                    switch("mov", "al", mem_for_variable[incode][0][operrand])
+                except:
+                    print("Failed!")
+                    print("Ошибка загрузки символа в регистр!")    
+                    return -1        
+        return 0            
     else:
         if operrand == "=":
             variable(incode, operrand2, operrand)     
@@ -674,7 +736,6 @@ def variable(name, data, oper):
                 mem_for_variable[name] = [value, PC_mem]
                 switch("mov", "al", value)
                 switch("store", PC_mem, value)
-                PC_mem += 1
                 return
 
             # строка
@@ -687,12 +748,10 @@ def variable(name, data, oper):
                     switch("mov", "al", value)
                     switch("store", PC_mem, value)
                     mem_for_variable[name].append([value, PC_mem])
-                    PC_mem += 1
                     print(PC_mem)
                 switch("sub", "al", "al")
                 switch("store", PC_mem, "al")    
                 mem_for_variable[name].append([0, PC_mem])
-                PC_mem += 1
                 return
                 
 
@@ -706,7 +765,6 @@ def variable(name, data, oper):
             mem_for_variable[name] = [int(data), PC_mem]
             switch("mov", "al", int(data))
             switch("store", PC_mem, int(data))
-            PC_mem += 1
     return
 #===================================        
 def start():
