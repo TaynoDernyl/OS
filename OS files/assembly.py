@@ -25,7 +25,7 @@ ascii_table = {
 }
 #===================================
 mem_for_variable = {} #наши переменные
-PC_mem = 4096
+PC_mem = 0
 valid_save = True
 def load_variables_from_file(comandfile):
     global mem_for_variable
@@ -203,8 +203,10 @@ else:
         temp_file = os.path.splitext(file)[0] + ".swg"
         comandfile = open(temp_file, "a") 
         load_variables_from_file(temp_file)
-        PC_mem = max(addr for values in mem_for_variable.values() for _, addr in values)
-        print(PC_mem)
+        try:
+            PC_mem = max(addr for values in mem_for_variable.values() for _, addr in values)
+        except:
+            pass
     else:
         temp_file = os.path.splitext(file)[0] + ".swg"
         comandfile = open(temp_file, "w+")  
@@ -264,6 +266,7 @@ def save_out():
         return 1    
 #===================================
 def read():
+    global valid_save
     binaryd.seek(0)
     index = 0
     stroke = binaryd.read()
@@ -303,6 +306,7 @@ def read():
             while True:
                 k = keyboard.read_key()
                 if k == "enter":
+                    save_out = False
                     break
                 elif k in "0123456789abcdef":
                     if len(temp) >= 2:
@@ -339,7 +343,7 @@ def parse_number(s):
 def switch(incode, operrand, operrand2):
     global file, comandfile, do_start, valid_save
     global binaryd, PC_mem, mem_for_variable
-    
+    binaryd.seek(0, 2)
     if operrand and operrand2 != 0:
         comandfile.write(str(incode)+" ")
         comandfile.write(str(operrand)+" ")
@@ -352,7 +356,6 @@ def switch(incode, operrand, operrand2):
         comandfile.write("input\n")    
     elif incode == "print":
         comandfile.write("print\n")    
-    binaryd.seek(0, 2)
     if incode == "open":
         file = input("напишите навзание файла для открытия(с .bin в конце для корректной работы):")
         try:
@@ -403,7 +406,6 @@ def switch(incode, operrand, operrand2):
                 binaryd.write(struct.pack("<H", int(operrand)+registers["DS"]))
                 PC_mem += 1
             else:
-                print("будет записан регистр al")
                 binaryd.write(struct.pack("<B", 0x05))
                 binaryd.write(struct.pack("<B", 0x00))
                 binaryd.write(struct.pack("<H", int(operrand)+registers["DS"]))
@@ -431,7 +433,6 @@ def switch(incode, operrand, operrand2):
         print("уверен?")
         temp = input("y/n:")
         if temp == "y" or temp == "Y" or temp == "yes":
-            PC_mem = registers["DS"]
             binaryd.truncate(0)
             comandfile.close()
             comandfile = open(temp_file, "w+")
@@ -465,9 +466,7 @@ def switch(incode, operrand, operrand2):
             else:
                 comandfile.write(f"{name}: ")
                 for val, addr in value:
-                    comandfile.write(f"(value={val}, addr={addr}) ")
-        comandfile.write("\n")            
-        comandfile.write("===================")            
+                    comandfile.write(f"(value={val}, addr={addr}) ")   
         do_start = False    
         t.join()
     elif incode == "f" or incode == "stop":
@@ -687,7 +686,7 @@ def switch(incode, operrand, operrand2):
                 return -1
             else:
                 try:
-                    switch("mov", operrand2, mem_for_variable[incode][0][operrand])
+                    switch("mov", operrand2, mem_for_variable[incode][operrand][0])
                 except:
                     print("Failed!")
                     print("Ошибка загрузки символа в регистр!")   
@@ -747,8 +746,7 @@ def variable(name, data, oper):
                     value = ord(ch)
                     switch("mov", "al", value)
                     switch("store", PC_mem, value)
-                    mem_for_variable[name].append([value, PC_mem])
-                    print(PC_mem)
+                    mem_for_variable[name].append([value, PC_mem-1])
                 switch("sub", "al", "al")
                 switch("store", PC_mem, "al")    
                 mem_for_variable[name].append([0, PC_mem])
