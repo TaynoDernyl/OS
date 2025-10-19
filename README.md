@@ -1,5 +1,9 @@
-[Интепретатор](Letosintlogo.png)
-[Процессор](Letoslogo.png)
+
+<p align="center">
+  <img src="Letoslogo.png" alt="LETOS" width="300">
+  <img src="Letosintlogo.png" alt="LETOS interpretator" width="300">
+</p>
+
 ## 💸 Поддержать проект
 
 Если хочешь поддержать разработку **LETOS** — можешь отправить донат:  
