@@ -26,9 +26,35 @@ ascii_table = {
 #===================================
 mem_for_variable = {} #наши переменные
 PC_mem = 0
+mem = [0] * 65536
 valid_save = True
+#===================================
+def sync_ax_to_parts():
+    """Синхронизирует AX -> AL и AH"""
+    global registers
+    ax_value = registers["AX"]
+    registers["AL"] = ax_value & 0xFF          # Младший байт
+    registers["AH"] = (ax_value >> 8) & 0xFF   # Старший байт
+
+def sync_parts_to_ax():
+    """Синхронизирует AL и AH -> AX"""
+    global registers
+    registers["AX"] = (registers["AH"] << 8) | registers["AL"]
+
+def sync_bx_to_parts():
+    """Синхронизирует BX -> BL и BH"""
+    global registers
+    bx_value = registers["BX"]
+    registers["BL"] = bx_value & 0xFF          # Младший байт
+    registers["BH"] = (bx_value >> 8) & 0xFF   # Старший байт
+
+def sync_parts_to_bx():
+    """Синхронизирует BL и BH -> BX"""
+    global registers
+    registers["BX"] = (registers["BH"] << 8) | registers["BL"]
+#===================================
 def load_variables_from_file(comandfile):
-    global mem_for_variable
+    global mem_for_variable, mem
     with open(comandfile, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -44,7 +70,10 @@ def load_variables_from_file(comandfile):
             matches = re.findall(r"\(value=(\d+), addr=(\d+)\)", rest)
             for val, addr in matches:
                 pairs.append([int(val), int(addr)])
-
+                mem[int(addr)] = int(val)
+                if int(addr) > len(mem):
+                    print("адрес больше памяти")
+                print(mem[int(addr)])    
             mem_for_variable[name] = pairs
 
     return mem_for_variable
@@ -53,101 +82,80 @@ do_start = True
 new_project = False
 #===================================
 def valid_of_reg(reg):
-    if reg in table_of_reg:
-        return table_of_reg[reg]
-    elif reg >= 0 and reg < 7:
-        return reg
-    else:
-        return -1
+    global table_of_reg
+    try:
+        reg = int(reg)
+        if reg >= 0 and reg < 8:
+            return reg
+        else:
+            return -1
+    except:   
+        if reg in table_of_reg:
+            return table_of_reg[reg]
+        else:
+            return -1
 #===================================
 def mov(op1, op2):
-    if op1 in bit16_registers:
+    global registers, table_of_reg
+    
+    reg1_code = valid_of_reg(op1)
+    
+    if reg1_code == -1:
+        print(f"Ошибка: неверный регистр {op1}")
+        return 1
+    
+    # Получаем имя регистра в ВЕРХНЕМ регистре
+    reg1_name = table_of_reg[reg1_code].upper()
+    
+    # Определяем размер операции
+    if reg1_name in ["AX", "BX", "DS", "CS"]:
         flag = 1
     else:
         flag = 0
-    if op1 in table_of_reg:
-            op1 = table_of_reg[op1]
-            if op2 in table_of_reg:
-                op2 = table_of_reg[op2]
-            else:
-                op2 = int(op2)
-            if flag == 0 :    
-                try:
-                    binaryd.write(struct.pack("<B", 0x20))
-                    binaryd.write(struct.pack("<B", flag))
-                    binaryd.write(struct.pack("<B", op1))
-                    binaryd.write(struct.pack("<B", op2))
-                    return 0
-                except:
-                    print(flag, op1, op2)
-                    print("ошибка 1")
-                    return 1
-            if flag == 1 :    
-                try:
-                    print(op1)
-                    if op1 == 6:
-                        print(op2)
-                        if not op2 >= 0 and op2 <= 7:
-                            registers["DS"] = op2
-                            return 0
-                        else:
-                            print("Failed!")
-                            print("Загрузка сегментных регистров недоступна из других регистров")    
-                            return -1
-                    if op1 == 7:
-                        print(op2)
-                        if not op2 >= 0 and op2 <= 7:
-                            registers["CS"] = op2
-                            return 0
-                        else:
-                            print("Failed!")
-                            print("Загрузка сегментных регистров недоступна из других регистров")    
-                            return -1    
-                    binaryd.write(struct.pack("<B", 0x20))
-                    binaryd.write(struct.pack("<B", flag))
-                    binaryd.write(struct.pack("<B", op1))
-                    binaryd.write(struct.pack("<H", op2))
-                    return 0
-                except:
-                    print("ошибка 1")
-                    return 1    
-    else:
-            op1 = int(op1)
-            if op1 >= 0 and op1 <=7:
-                if op2 in table_of_reg:
-                    op2 = table_of_reg[op2]
-                else:
-                    op2 = int(op2)   
-                if flag == 0: 
-                    try:
-                        binaryd.write(struct.pack("<B", 0x20))
-                        binaryd.write(struct.pack("<B", flag))
-                        binaryd.write(struct.pack("<B", op1))
-                        binaryd.write(struct.pack("<B", op2))
-                        return 0
-                    except:
-                        print("ошибка 2")
-                        return 1
-                if flag == 1: 
-                    try:
-                        if op1 == 6:
-                            if valid_of_reg(op2) != -1:
-                                registers["DS"] = op2
-                            else:
-                                print("Failed!")
-                                print("Загрузка сегментных регистров недоступна из других регистров")    
-                                return -1
-                        binaryd.write(struct.pack("<B", 0x20))
-                        binaryd.write(struct.pack("<B", flag))
-                        binaryd.write(struct.pack("<B", op1))
-                        binaryd.write(struct.pack("<H", op2))
-                        return 0
-                    except:
-                        print("ошибка 2")
-                        return 1    
-            else:    
-                print("введен неверный регистр!")
-                return 1
+    
+    # Обновляем значение в registers
+    reg2_code = valid_of_reg(op2)
+    if reg2_code != -1:  # op2 - регистр
+        # Получаем имя второго регистра
+        reg2_name = table_of_reg[reg2_code].upper()
+        registers[reg1_name] = registers[reg2_name]
+        print(f"{reg1_name} = {registers[reg1_name]}")
+        value_to_write = reg2_code
+    else:  # op2 - число
+        try:
+            value = int(op2)
+            registers[reg1_name] = value
+            print(f"{reg1_name} = {value}")
+            value_to_write = value
+        except:
+            print(f"Ошибка: неверный второй операнд {op2}")
+            return 1
+    
+    # Синхронизация ВСЕХ регистров
+    if reg1_code == 4:
+        sync_ax_to_parts()
+    elif reg1_code == 0 or reg1_code == 1:
+        sync_parts_to_ax()
+    elif reg1_code == 5:
+        sync_bx_to_parts()
+    elif reg1_code == 2 or reg1_code == 3:
+        sync_parts_to_bx()
+    
+    # Запись в бинарный файл
+    try:
+        binaryd.write(struct.pack("<B", 0x20))
+        binaryd.write(struct.pack("<B", flag))
+        binaryd.write(struct.pack("<B", reg1_code))
+        
+        if flag == 1:  # 16-битная операция
+            binaryd.write(struct.pack("<H", value_to_write))
+        else:  # 8-битная операция
+            binaryd.write(struct.pack("<B", value_to_write))
+            
+        return 0
+    except Exception as e:
+        print(f"ошибка записи: {e}")
+        return 1
 #===================================
 def auto_save():
     global valid_save
@@ -213,8 +221,11 @@ else:
         new_project = False
     print("Ready for work!")    
     print("введите help для ознакомления")
-    comandfile.write("===================")
-    comandfile.write("\n")
+    if "===================" in open(temp_file, "r").read():
+        pass
+    else:
+        comandfile.write("===================")
+        comandfile.write("\n")
     t.start()
 #=================================== 
 table_of_reg = {
@@ -233,7 +244,17 @@ table_of_reg = {
     "DS": 6,
     "ds": 6,
     "CS": 7,
-    "cs": 7
+    "cs": 7,
+    
+    # Обратное соответствие
+    0: "AL",
+    1: "AH", 
+    2: "BL",
+    3: "BH",
+    4: "AX",
+    5: "BX",
+    6: "DS",
+    7: "CS"
 }
 
 registers = {
@@ -264,6 +285,116 @@ def save_out():
             return 1
     except:
         return 1    
+#===================================
+def inc(op1):
+    global table_of_reg, registers
+    reg_code = valid_of_reg(op1)
+    if reg_code == -1:
+        print("Ошибка: неверный регистр")
+        return
+    
+    reg_name = table_of_reg[reg_code].upper()
+    registers[reg_name] += 1
+    
+    if reg_name == "AX":
+        sync_ax_to_parts()
+    elif reg_name == "BX":
+        sync_bx_to_parts()
+    elif reg_name == "AL" or reg_name == "AH":
+        sync_parts_to_ax()
+    elif reg_name == "BL" or reg_name == "BH":
+        sync_parts_to_bx()
+    
+    number = struct.pack("<B", 0x09)
+    binaryd.write(number)    
+    binaryd.write(struct.pack("<B", reg_code))
+    return
+
+def dec(op1):
+    global table_of_reg, registers
+    reg_code = valid_of_reg(op1)
+    if reg_code == -1:
+        print("Ошибка: неверный регистр")
+        return
+    
+    reg_name = table_of_reg[reg_code].upper()
+    registers[reg_name] -= 1
+    
+
+    if reg_name == "AX":
+        sync_ax_to_parts()
+    elif reg_name == "BX":
+        sync_bx_to_parts()
+    elif reg_name == "AL" or reg_name == "AH":
+        sync_parts_to_ax()
+    elif reg_name == "BL" or reg_name == "BH":
+        sync_parts_to_bx()
+    
+    number = struct.pack("<B", 0x0A)
+    binaryd.write(number)    
+    binaryd.write(struct.pack("<B", reg_code))
+    return
+
+def add(reg1, reg2):
+    global table_of_reg, registers
+    reg1_code = valid_of_reg(reg1)
+    reg2_code = valid_of_reg(reg2)
+    
+    if reg1_code == -1 or reg2_code == -1:
+        print("Ошибка: неверный регистр")
+        return
+    
+    reg1_name = table_of_reg[reg1_code].upper()
+    
+    if reg2_code != -1:  # reg2 - регистр
+        reg2_name = table_of_reg[reg2_code].upper()
+        registers[reg1_name] += registers[reg2_name]
+    else:  # reg2 - число
+        registers[reg1_name] += int(reg2)
+    
+    if reg1_name == "AX":
+        sync_ax_to_parts()
+    elif reg1_name == "BX":
+        sync_bx_to_parts()
+    elif reg1_name == "AL" or reg1_name == "AH":
+        sync_parts_to_ax()
+    elif reg1_name == "BL" or reg1_name == "BH":
+        sync_parts_to_bx()
+    return
+
+def sub(reg1, reg2):
+    global table_of_reg, registers
+    reg1_code = valid_of_reg(reg1)
+    
+    if reg1_code == -1:
+        print("Ошибка: неверный первый регистр")
+        return
+    
+    reg1_name = table_of_reg[reg1_code].upper()
+    reg2_code = valid_of_reg(reg2)
+    
+    if reg2_code != -1:  # reg2 - регистр
+        reg2_name = table_of_reg[reg2_code].upper()
+        registers[reg1_name] -= registers[reg2_name]  
+        print(f"{reg1_name} = {reg1_name} - {reg2_name} = {registers[reg1_name]}")
+    else:  # reg2 - число
+        try:
+            value = int(reg2)
+            registers[reg1_name] -= value  
+            print(f"{reg1_name} = {reg1_name} - {value} = {registers[reg1_name]}")
+        except:
+            print("Ошибка: неверный второй операнд")
+            return
+    
+    if reg1_name == "AX":
+        sync_ax_to_parts()
+    elif reg1_name == "BX":
+        sync_bx_to_parts()
+    elif reg1_name == "AL" or reg1_name == "AH":
+        sync_parts_to_ax()
+    elif reg1_name == "BL" or reg1_name == "BH":
+        sync_parts_to_bx()
+    return
 #===================================
 def read():
     global valid_save
@@ -341,10 +472,10 @@ def parse_number(s):
         return s
 #===================================
 def switch(incode, operrand, operrand2):
-    global file, comandfile, do_start, valid_save
-    global binaryd, PC_mem, mem_for_variable
+    global file, comandfile, do_start, valid_save, mem
+    global binaryd, PC_mem, mem_for_variable, temp_file
     binaryd.seek(0, 2)
-    if operrand and operrand2 != 0:
+    if operrand != 0:
         comandfile.write(str(incode)+" ")
         comandfile.write(str(operrand)+" ")
         comandfile.write(str(operrand2)+" ")
@@ -404,11 +535,17 @@ def switch(incode, operrand, operrand2):
                 binaryd.write(struct.pack("<B", 0x05))
                 binaryd.write(struct.pack("<B", a))
                 binaryd.write(struct.pack("<H", int(operrand)+registers["DS"]))
+                mem[int(operrand)+registers["DS"]] = registers[table_of_reg[a]]
                 PC_mem += 1
             else:
                 binaryd.write(struct.pack("<B", 0x05))
                 binaryd.write(struct.pack("<B", 0x00))
                 binaryd.write(struct.pack("<H", int(operrand)+registers["DS"]))
+                try: 
+                    operrand2 = int(operrand2) 
+                    mem[int(operrand)+registers["DS"]] = operrand2
+                except:
+                    print("введен неверный регистр")
                 PC_mem += 1
         except:
             print("ошибка записи!")    
@@ -421,12 +558,21 @@ def switch(incode, operrand, operrand2):
                 binaryd.write(struct.pack("<B", 0x04))
                 binaryd.write(struct.pack("<B", a))
                 binaryd.write(struct.pack("<H", int(operrand2)+registers["DS"]))
+                registers[table_of_reg[a]] = mem[int(operrand2)+registers["DS"]]
                 PC_mem += 1
             else:
                 print(a)
                 print("ошибка регистра!")
         except:
             print("ошибка записи!")    
+        return
+    elif incode == "reg":
+        print("=== РЕГИСТРЫ ===")
+        print(f"AX: {registers['AX']} (0x{registers['AX']:04X})")
+        print(f"  AL: {registers['AL']} (0x{registers['AL']:02X}), AH: {registers['AH']} (0x{registers['AH']:02X})")
+        print(f"BX: {registers['BX']} (0x{registers['BX']:04X})")
+        print(f"  BL: {registers['BL']} (0x{registers['BL']:02X}), BH: {registers['BH']} (0x{registers['BH']:02X})")
+        print(f"DS: {registers['DS']}, CS: {registers['CS']}")
         return
     elif incode == "clear":
         valid_save = False
@@ -440,7 +586,7 @@ def switch(incode, operrand, operrand2):
             print("удалено")
         else:
             print("отменено")
-        start()      
+        return     
     elif incode == "разослать":
         try:
             if operrand == "школе":
@@ -451,47 +597,50 @@ def switch(incode, operrand, operrand2):
                 print("не разослано")   
         except:
             print("не разослано")    
-        start()
+        return
+    elif incode == "mem":
+        try:
+            print(mem[int(operrand)+registers["DS"]])    
+        except:
+            print("указывайте правильную память")    
+        return
     elif incode == "q":
         binaryd.seek(0, 2)
         stop_thread.set()
         print("Thank you for using Letos;)")
         for name, value in mem_for_variable.items():
-            comandfile.write("\n")
-            # если обычная переменная: [value, addr]
-            if isinstance(value[0], int):
-                val, addr = value
-                comandfile.write(f"{name}: value={val}, address={addr}")
-            # если строка (список списков)
+            if name in open(temp_file, "r").read():
+                pass
             else:
-                comandfile.write(f"{name}: ")
-                for val, addr in value:
-                    comandfile.write(f"(value={val}, addr={addr}) ")   
+                comandfile.write("\n")
+                # если обычная переменная: [value, addr]
+                if isinstance(value[0], int):
+                    val, addr = value
+                    comandfile.write(f"{name}: value={val}, address={addr}")
+                # если строка (список списков)
+                else:
+                    comandfile.write(f"{name}: ")
+                    for val, addr in value:
+                        comandfile.write(f"(value={val}, addr={addr}) ")   
+        comandfile.write("\n")            
         do_start = False    
         t.join()
     elif incode == "f" or incode == "stop":
         valid_save = False
         number = struct.pack("<B", 0xFF)
         binaryd.write(number)
-        start()
+        return
     elif incode == "cc":
         try:
             code = open("code.bin", "wb+")
             print("файл создан")
             code.close
-            start()
         except:
             print("неизвестная ошибка")
-            start()   
+        return
     elif incode == "mov":
         valid_save = False
-        try:
-            prost = mov(operrand, operrand2)
-            if prost == -1:
-                comandfile.write("Failed operation!")
-                comandfile.write("\n")
-        except:
-            print("ошибка")
+        mov(operrand, operrand2)
         return         
     elif incode == "si":
         valid_save = True
@@ -505,65 +654,67 @@ def switch(incode, operrand, operrand2):
                     binsave.close()
                     binaryd.seek(0, 2)
                     print("Успешно!")
-                    start()
+                    
                 except:
                     print("ошибка записи")    
             except:
                 print("ошибка")
-                start()
+                
         else:
             print("изменения не сохранены")
-            start()    
+        return   
     elif incode == "so":
         valid_save = True
         if input("вы уверены?y/n:") == "y":
             result = save_out()
             if result == 1:
                 print("ошибка при записи файла, убедитесь что есть файл code.bin")
-                start()
+                
             elif result == 0:
                 print("Успешно!")
-                start()
+                
             else:
                 print("неизвестная ошибка?")
         else:
             print("изменения не сохранены")
-            start()   
+        return  
     elif incode == "b":
         valid_save = False
         binaryd.seek(0, 2)
         size = binaryd.tell()
         binaryd.truncate(size -1)
-        start() 
+        comandfile.write("X\n")
+        return
     elif incode == "r":
         read()
-        start()
+        return
     elif incode == "var":
         print(mem_for_variable)    
-        start()
+        return
     elif incode == "jmp":
         valid_save = False
         number = struct.pack("<B", 0x0B)
         binaryd.write(number)
         number = struct.pack("<H", operrand)
         binaryd.write(number)
-        start()
+        return
     elif incode == "jz":
         valid_save = False
         number = struct.pack("<B", 0x0C)
         binaryd.write(number)
         number = struct.pack("<H", operrand)
         binaryd.write(number)
-        start()
+        return
     elif incode == "jnz":
         valid_save = False
         number = struct.pack("<B", 0x0D)
         binaryd.write(number)
         number = struct.pack("<H", operrand)
         binaryd.write(number)
-        start()
+        return
     elif incode == "add":
         valid_save = False
+        add(operrand, operrand2)
         if operrand in table_of_reg:
             number = struct.pack("<B", 0x08)
             binaryd.write(number)    
@@ -599,9 +750,10 @@ def switch(incode, operrand, operrand2):
             number = struct.pack("<B", temp1)
             binaryd.write(number)  
 
-        start()
+        return
     elif incode == "sub":
         valid_save = False
+        sub(operrand, operrand2)
         if operrand in table_of_reg:
             number = struct.pack("<B", 0x07)
             binaryd.write(number)    
@@ -639,23 +791,17 @@ def switch(incode, operrand, operrand2):
         return
     elif incode == "inc":
         valid_save = False
-        number = struct.pack("<B", 0x09)
-        binaryd.write(number)    
-        a = valid_of_reg(operrand)
-        binaryd.write(struct.pack("<B", a))
-        start()    
+        inc(operrand)
+        return
     elif incode == "dec":
         valid_save = False
-        number = struct.pack("<B", 0x0A)
-        binaryd.write(number)    
-        a = valid_of_reg(operrand)
-        binaryd.write(struct.pack("<B", a))
-        start()    
+        dec(operrand)
+        return
     elif incode == "print":
         valid_save = False
         number = struct.pack("<B", 0x0E)
         binaryd.write(number)    
-        start()            
+        return           
     elif incode == "comp":
         valid_save = False
         number = struct.pack("<B", 0xD0)
@@ -664,16 +810,16 @@ def switch(incode, operrand, operrand2):
         binaryd.write(struct.pack("<B", a))
         a = valid_of_reg(operrand2)
         binaryd.write(struct.pack("<B", a))
-        start()
+        return
     elif incode == "PC":
         switch("mov", "ds", int(operrand))
         PC_mem = int(operrand)    
-        start()
+        return
     elif incode == "input":   
         valid_save = False
         number = struct.pack("<B", 0xF9)
         binaryd.write(number)   
-        start()
+        return
     elif incode in mem_for_variable:
         try:
             operrand = int(operrand)
@@ -710,10 +856,10 @@ def switch(incode, operrand, operrand2):
         if operrand == "=":
             variable(incode, operrand2, operrand)     
         else:
-            pass
-        start()               
+            print("неизвсетная команда")
+        return             
 def variable(name, data, oper):
-    global binaryd, comandfile
+    global binaryd, comandfile, registers
     global PC_mem, mem_for_variable
 
     try:
@@ -732,7 +878,7 @@ def variable(name, data, oper):
                 else:
                     PC_mem += 1
 
-                mem_for_variable[name] = [value, PC_mem]
+                mem_for_variable[name] = [value, PC_mem+registers["DS"]]
                 switch("mov", "al", value)
                 switch("store", PC_mem, value)
                 return
@@ -746,10 +892,10 @@ def variable(name, data, oper):
                     value = ord(ch)
                     switch("mov", "al", value)
                     switch("store", PC_mem, value)
-                    mem_for_variable[name].append([value, PC_mem-1])
+                    mem_for_variable[name].append([value, PC_mem-1+registers["DS"]])
                 switch("sub", "al", "al")
                 switch("store", PC_mem, "al")    
-                mem_for_variable[name].append([0, PC_mem])
+                mem_for_variable[name].append([0, PC_mem-1+registers["DS"]])
                 return
                 
 
@@ -760,7 +906,7 @@ def variable(name, data, oper):
             else:
                 PC_mem += 1
 
-            mem_for_variable[name] = [int(data), PC_mem]
+            mem_for_variable[name] = [int(data), PC_mem+registers["DS"]]
             switch("mov", "al", int(data))
             switch("store", PC_mem, int(data))
     return
