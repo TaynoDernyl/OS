@@ -523,7 +523,7 @@ def switch(incode, operrand, operrand2):
             PC — устанавливает указатель памяти PC_mem и сегмент данных DS.\n
             input — записывает команду ожидания пользовательского ввода.\n
             a = b - создание переменной.\n
-            a *символ в переменной* *регистр* - загружает определенный символ с переменной в регистр(счет символов начинается с 0)
+            a *символ в переменной либо регистр* *регистр* - загружает определенный символ с переменной в регистр(счет символов начинается с 0)
             mem *число* - показывает что находиться в памяти по этому адресу
             reg - показывает регистры
             ---: - файл сохранен.\n
@@ -829,9 +829,13 @@ def switch(incode, operrand, operrand2):
             pass   
         if valid_of_reg(operrand2) >= 0:  
             if isinstance(operrand, str):
-                print("Failed!")
-                print("символ указывается только определенным числом, не регистром!")
-                return -1
+                if operrand.upper() in registers:
+                    try:
+                        switch("mov", operrand2, mem_for_variable[incode][registers[operrand.upper()]][0])
+                    except:
+                        print("Failed!")
+                        print("Ошибка загрузки символа в регистр!")   
+                        return -1        
             else:
                 try:
                     switch("mov", operrand2, mem_for_variable[incode][operrand][0])
@@ -843,9 +847,12 @@ def switch(incode, operrand, operrand2):
             print("Failed!")
             print("неизвестный регистр, будет использоваться регистр al")    
             if isinstance(operrand, str):
-                print("Failed!")
-                print("символ указывается только определенным числом, не регистром!")
-                return -1
+                try:
+                        switch("mov", operrand2, mem_for_variable[incode][registers[operrand.upper()]][0])
+                except:
+                        print("Failed!")
+                        print("Ошибка загрузки символа в регистр!")   
+                        return -1     
             else:
                 try:
                     switch("mov", "al", mem_for_variable[incode][0][operrand])
