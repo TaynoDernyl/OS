@@ -26,6 +26,7 @@ ascii_table = {
 #===================================
 mem_for_variable = {} #наши переменные
 PC_mem = 0
+PC = 0
 mem = [0] * 65536
 valid_save = True
 #===================================
@@ -96,7 +97,7 @@ def valid_of_reg(reg):
             return -1
 #===================================
 def mov(op1, op2):
-    global registers, table_of_reg
+    global registers, table_of_reg, PC
     
     reg1_code = valid_of_reg(op1)
     
@@ -149,8 +150,10 @@ def mov(op1, op2):
         
         if flag == 1:  # 16-битная операция
             binaryd.write(struct.pack("<H", value_to_write))
+            PC += 5
         else:  # 8-битная операция
             binaryd.write(struct.pack("<B", value_to_write))
+            PC += 4
             
         return 0
     except Exception as e:
@@ -472,9 +475,16 @@ def parse_number(s):
         return s
 #===================================
 def switch(incode, operrand, operrand2):
-    global file, comandfile, do_start, valid_save, mem
+
+    global file, comandfile, do_start, valid_save, mem, PC
     global binaryd, PC_mem, mem_for_variable, temp_file
     binaryd.seek(0, 2)
+    if incode.endswith(':'):
+        label_name = incode[:-1]  # убираем двоеточие
+        # сохраняем метку с текущим PC_mem
+        mem_for_variable[label_name] = [["label", PC]]
+        comandfile.write(f"{incode}\n")  # записываем в .swg как есть
+        return
     if operrand != 0:
         comandfile.write(str(incode)+" ")
         comandfile.write(str(operrand)+" ")
@@ -526,6 +536,7 @@ def switch(incode, operrand, operrand2):
             a *символ в переменной либо регистр* *регистр* - загружает определенный символ с переменной в регистр(счет символов начинается с 0)
             mem *число* - показывает что находиться в памяти по этому адресу
             reg - показывает регистры
+            "название метки": - записывает метку, при вызове jmp, jnz, jz можно написать название метки и будет перебрасывать на нее
             ---: - файл сохранен.\n
             ***: - файл не сохранен.\n""")
         return    
@@ -539,6 +550,7 @@ def switch(incode, operrand, operrand2):
                 binaryd.write(struct.pack("<H", int(operrand)+registers["DS"]))
                 mem[int(operrand)+registers["DS"]] = registers[table_of_reg[a]]
                 PC_mem += 1
+                
             else:
                 binaryd.write(struct.pack("<B", 0x05))
                 binaryd.write(struct.pack("<B", 0x00))
@@ -549,6 +561,7 @@ def switch(incode, operrand, operrand2):
                 except:
                     print("введен неверный регистр")
                 PC_mem += 1
+            PC += 4    
         except:
             print("ошибка записи!")    
         return
@@ -565,6 +578,7 @@ def switch(incode, operrand, operrand2):
             else:
                 print(a)
                 print("ошибка регистра!")
+            PC += 4    
         except:
             print("ошибка записи!")    
         return
@@ -631,6 +645,7 @@ def switch(incode, operrand, operrand2):
         valid_save = False
         number = struct.pack("<B", 0xFF)
         binaryd.write(number)
+        PC += 1
         return
     elif incode == "cc":
         try:
@@ -695,24 +710,42 @@ def switch(incode, operrand, operrand2):
         return
     elif incode == "jmp":
         valid_save = False
-        number = struct.pack("<B", 0x0B)
-        binaryd.write(number)
-        number = struct.pack("<H", operrand)
-        binaryd.write(number)
+        if operrand in mem_for_variable and mem_for_variable[operrand][0][0] == "label":
+            label_address = mem_for_variable[operrand][0][1]
+            binaryd.write(struct.pack("<B", 0x0B))
+            binaryd.write(struct.pack("<H", label_address))
+        else:    
+            number = struct.pack("<B", 0x0B)
+            binaryd.write(number)
+            number = struct.pack("<H", operrand)
+            binaryd.write(number)
+        PC += 3
         return
     elif incode == "jz":
         valid_save = False
-        number = struct.pack("<B", 0x0C)
-        binaryd.write(number)
-        number = struct.pack("<H", operrand)
-        binaryd.write(number)
+        if operrand in mem_for_variable and mem_for_variable[operrand][0][0] == "label":
+            label_address = mem_for_variable[operrand][0][1]
+            binaryd.write(struct.pack("<B", 0x0C))
+            binaryd.write(struct.pack("<H", label_address))
+        else:    
+            number = struct.pack("<B", 0x0C)
+            binaryd.write(number)
+            number = struct.pack("<H", operrand)
+            binaryd.write(number)
+        PC += 3
         return
     elif incode == "jnz":
         valid_save = False
-        number = struct.pack("<B", 0x0D)
-        binaryd.write(number)
-        number = struct.pack("<H", operrand)
-        binaryd.write(number)
+        if operrand in mem_for_variable and mem_for_variable[operrand][0][0] == "label":
+            label_address = mem_for_variable[operrand][0][1]
+            binaryd.write(struct.pack("<B", 0x0D))
+            binaryd.write(struct.pack("<H", label_address))
+        else:    
+            number = struct.pack("<B", 0x0D)
+            binaryd.write(number)
+            number = struct.pack("<H", operrand)
+            binaryd.write(number)
+        PC += 3
         return
     elif incode == "add":
         valid_save = False
@@ -751,7 +784,7 @@ def switch(incode, operrand, operrand2):
             temp1 = operrand2
             number = struct.pack("<B", temp1)
             binaryd.write(number)  
-
+        PC += 3
         return
     elif incode == "sub":
         valid_save = False
@@ -790,19 +823,23 @@ def switch(incode, operrand, operrand2):
             temp1 = operrand2
             number = struct.pack("<B", temp1)
             binaryd.write(number)  
+        PC += 3    
         return
     elif incode == "inc":
         valid_save = False
         inc(operrand)
+        PC += 2
         return
     elif incode == "dec":
         valid_save = False
         dec(operrand)
+        PC += 2
         return
     elif incode == "print":
         valid_save = False
         number = struct.pack("<B", 0x0E)
         binaryd.write(number)    
+        PC += 1
         return           
     elif incode == "comp":
         valid_save = False
@@ -812,6 +849,7 @@ def switch(incode, operrand, operrand2):
         binaryd.write(struct.pack("<B", a))
         a = valid_of_reg(operrand2)
         binaryd.write(struct.pack("<B", a))
+        PC += 3
         return
     elif incode == "PC":
         switch("mov", "ds", int(operrand))
@@ -821,6 +859,7 @@ def switch(incode, operrand, operrand2):
         valid_save = False
         number = struct.pack("<B", 0xF9)
         binaryd.write(number)   
+        PC += 1
         return
     elif incode in mem_for_variable:
         try:
