@@ -1,5 +1,4 @@
 import struct
-import keyboard
 import threading 
 import os
 import time
@@ -110,9 +109,13 @@ def compile_all():
         print(f"Компиляция: {command} по адресу {current_address}")
         
         # Компиляция команд
+        
         if opcode == 'mov':
             compile_mov(operand1, operand2)
             current_address += 4
+        elif opcode == 'printstr':
+            compile_print_str()
+            current_address += 1    
         elif opcode == 'jmp':
             compile_jump('jmp', operand1)
             current_address += 3
@@ -233,12 +236,16 @@ def compile_store(op1, op2):
     try:
         reg_code = valid_of_reg(op2)
         if reg_code >= 0:
+            print(f"DEBUG COMPILE: STORE [{op1}], регистр {table_of_reg[reg_code]}")
+            print(f"  Код: 05 {reg_code:02X} {int(op1):04X}h")
             binaryd.write(struct.pack("<B", 0x05))
             binaryd.write(struct.pack("<B", reg_code))
             binaryd.write(struct.pack("<H", int(op1)))
         else:
+            print(f"DEBUG COMPILE: STORE [{op1}], значение {op2}")
+            print(f"  Код: 05 00 {int(op1):04X}h")
             binaryd.write(struct.pack("<B", 0x05))
-            binaryd.write(struct.pack("<B", 0x00))
+            binaryd.write(struct.pack("<B", 0x00))  # 0 означает "значение"
             binaryd.write(struct.pack("<H", int(op1)))
     except Exception as e:
         print(f"Ошибка компиляции store: {e}")
@@ -278,6 +285,11 @@ def compile_stop():
         binaryd.write(struct.pack("<B", 0xFF))
     except Exception as e:
         print(f"Ошибка компиляции stop: {e}")
+def compile_print_str():
+    try:
+        binaryd.write(struct.pack("<B", 0x10))  # Новый код операции
+    except Exception as e:
+        print(f"Ошибка компиляции print_str: {e}")
 
 def parse_operand(operand):
     if operand is None:
@@ -354,24 +366,7 @@ def mov(op1, op2):
     elif reg1_code == 2 or reg1_code == 3:
         sync_parts_to_bx()
     
-    return 0
-
-def auto_save():
-    global valid_save
-    while not stop_thread.is_set():
-        if stop_thread.wait(60):
-            break
-        temp_save = open("##temp##.bin", "wb+")
-        try:
-            binaryd.seek(0)
-            save_out_file = binaryd.read()
-            temp_save.write(save_out_file)
-            binaryd.seek(0, 2)
-            valid_save = True
-        except:
-            print("ошибка?")    
-t = threading.Thread(target=auto_save)  
-stop_thread = threading.Event()  
+    return 0 
 
 print("> BOOT LETOS INTERPRETATOR v0.0.3\n===================\n|Start your work:)|\n===================")
 file = input("напишите навзание файла для открытия:")
@@ -425,7 +420,6 @@ else:
     else:
         comandfile.write("===================")
         comandfile.write("\n")
-    t.start()
 
 table_of_reg = {
     "AL": 0, "AH": 1, "BL": 2, "BH": 3, "AX": 4, "BX": 5, "DS": 6, "CS": 7,
@@ -554,63 +548,6 @@ def sub(reg1, reg2):
         sync_parts_to_bx()
     return
 
-def read():
-    global valid_save
-    binaryd.seek(0)
-    index = 0
-    stroke = binaryd.read()
-    if len(stroke) == 0:
-        print("файл пуст")
-        return
-    while True:
-        os.system("cls" if os.name == "nt" else "clear")
-        for b in stroke:
-            print(f"0x{b:02x}", end=" ")
-        print()
-        size = len(stroke)
-        for i in range(size):
-            if i == index:
-                print("^", end="    ")
-            else:
-                print(" ", end="    ")
-        print()
-        temp = ""
-        key = keyboard.read_key()  
-        if key == "left":
-            index = (index - 1) % size
-            time.sleep(0.15)
-        elif key == "right":
-            index = (index + 1) % size
-            time.sleep(0.15)
-        elif key in ("q", "esc"):
-            os.system("cls" if os.name == "nt" else "clear")
-            break
-        elif key in "0123456789abcdef":
-            while True:
-                k = keyboard.read_key()
-                if k == "enter":
-                    save_out = False
-                    break
-                elif k in "0123456789abcdef":
-                    if len(temp) >= 2:
-                        pass
-                    else:
-                        time.sleep(0.15)
-                        temp += k
-                        print(k, end="", flush=True)
-            try:
-                if temp:
-                    value = int(temp, 16)
-                    binaryd.seek(index)
-                    number = struct.pack("<B", value)
-                    binaryd.write(number)
-                    binaryd.flush()
-                    return read()
-            except:
-                print("выход")
-                break
-    return          
-
 def parse_number(s):
     if s is None:
         return 0
@@ -622,7 +559,7 @@ def parse_number(s):
     except ValueError:
         return s
 
-def switch(incode, operrand, operrand2):
+def switch(incode, operrand=None, operrand2=None):
     global file, comandfile, do_start, valid_save, mem, PC
     global binaryd, PC_mem, mem_for_variable, temp_file, commands, compile_mode
     
@@ -637,7 +574,7 @@ def switch(incode, operrand, operrand2):
     # Список валидных команд для компиляции (только те, что генерируют код)
     valid_compile_commands = [
         'store', 'load', 'mov', 'jmp', 'jz', 'jnz', 'add', 'sub', 
-        'inc', 'dec', 'print', 'comp', 'input', 'f', 'stop'
+        'inc', 'dec', 'print', 'comp', 'input', 'f', 'stop', 'printstr'
     ]
     
     # Проверка валидности команды (только для компилируемых команд)
@@ -646,29 +583,22 @@ def switch(incode, operrand, operrand2):
         pass
     else:
         # Добавление команды в список для компиляции
-        if operrand != 0 and operrand2 != 0:
+        if operrand and operrand2:  # если оба не пустые/не None
             commands.append(f"{incode} {operrand} {operrand2}")
-        elif operrand != 0:
+        elif operrand:  # если только operrand не пустой
             commands.append(f"{incode} {operrand}")
-        else:
+        else:  # если оба пустые
             commands.append(incode)
         
     # Запись в .swg файл
-    if operrand != 0:
+    if operrand != None:
         comandfile.write(f"{incode} {operrand} {operrand2}\n")
     else:
-        comandfile.write(f"{incode}\n")
-        
-    # Специальные случаи для записи в .swg
-    if incode == "f":
-        comandfile.write("stop\n")
-    elif incode == "input":
-        comandfile.write("input\n")    
-    elif incode == "print":
-        comandfile.write("print\n")    
+        comandfile.write(f"{incode}\n")   
         
     # Компиляция
     if incode == "compile":
+        valid_save = True
         compile_mode = True
         compile_all()
         return
@@ -692,11 +622,15 @@ sub — вычитание
 inc — инкремент
 dec — декремент
 print — вывод
+printstr - вывод строки, адрес начала строки хранится в регистре bh
 input — ввод
 com - показать список команд для компиляции
 ---: - файл сохранен
 ***: - файл не сохранен""")
         return    
+    elif incode == "printstr":
+        valid_save = False
+        return
     elif incode == "store":
         valid_save = False
         try:
@@ -760,7 +694,6 @@ com - показать список команд для компиляции
         return
     elif incode == "q":
         binaryd.seek(0, 2)
-        stop_thread.set()
         print("Thank you for using Letos;)")
         for name, value in mem_for_variable.items():
             if name in open(temp_file, "r").read():
@@ -776,7 +709,6 @@ com - показать список команд для компиляции
                         comandfile.write(f"(value={val}, addr={addr}) ")   
         comandfile.write("\n")            
         do_start = False    
-        t.join()
     elif incode == "f" or incode == "stop":
         valid_save = False
         return
@@ -854,7 +786,10 @@ com - показать список команд для компиляции
                 except:
                     print("Ошибка загрузки символа в регистр!")    
                     return -1        
-        return 0            
+        return 0    
+    elif incode == "var":
+        print(mem_for_variable)   
+        return     
     else:
         if operrand == "=":
             variable(incode, operrand2, operrand)     
@@ -866,13 +801,18 @@ com - показать список команд для компиляции
 def variable(name, data, oper):
     global registers, PC_mem, mem_for_variable
 
+    # Проверка на None
+    if data is None:
+        print(f"Ошибка: данные для переменной '{name}' не указаны")
+        return
+
     try:
         data = int(data)
     except:
         pass
 
     if oper == "=":
-        if isinstance(data, str) or data > 255:
+        if isinstance(data, str) or (data is not None and data > 255):
             data = str(data)
             if len(data) == 1:
                 value = ord(data)
@@ -880,8 +820,11 @@ def variable(name, data, oper):
                     PC_mem = mem_for_variable[name][1]
                 else:
                     PC_mem += 1
-
-                mem_for_variable[name] = [value, PC_mem+registers["DS"]]
+                
+                # СНАЧАЛА устанавливаем значение в AL, ПОТОМ сохраняем
+                switch("mov", "al", str(value))  # явно преобразуем в строку
+                switch("store", str(PC_mem), "al")  # явно преобразуем в строку
+                mem_for_variable[name] = [value, PC_mem-1+registers["DS"]]
                 return
             else:
                 if name not in mem_for_variable:
@@ -889,33 +832,51 @@ def variable(name, data, oper):
 
                 for ch in data:
                     value = ord(ch)
-                    mem_for_variable[name].append([value, PC_mem-1+registers["DS"]])
+                    mem_for_variable[name].append([value, PC_mem+registers["DS"]])
+                    # СНАЧАЛА устанавливаем значение в AL, ПОТОМ сохраняем
+                    switch("mov", "al", str(value))
+                    switch("store", str(PC_mem), "al")
+                
+                # Добавляем нулевой терминатор
+                switch("sub", "al", "al")
+                switch("store", str(PC_mem), "al")
                 mem_for_variable[name].append([0, PC_mem-1+registers["DS"]])
+                
                 return
         else:
             if name in mem_for_variable:
                 PC_mem = mem_for_variable[name][1]
             else:
                 PC_mem += 1
-
+            
+            # Для числовых значений
+            switch("mov", "al", str(data))
+            switch("store", str(PC_mem), "al")
             mem_for_variable[name] = [int(data), PC_mem+registers["DS"]]
-    return
 
+    return
 def start():
-    global valid_save
+    global valid_save, do_start
     if valid_save == True:
         ans = input("---:")
     else:
         ans = input("***:")
     parts = ans.split()
     command = parts[0] if parts else ""
-    opperand = 0
-    opperand2 = 0
-    if len(parts) > 1:
+    if command == "q":
+        switch("compile")
+        do_start = False
+        return
+    if len(parts) == 1:
+        switch(command)
+    elif len(parts) == 2:
         opperand = parts[1]
-    if len(parts) > 2:
+        switch(command, opperand)   
+    if len(parts) >= 3:
+        opperand = parts[1]
         opperand2 = parts[2]    
-    switch(command, opperand, opperand2)   
+        switch(command, opperand, opperand2)   
+           
     while do_start:
         start()
 
