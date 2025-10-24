@@ -1,7 +1,7 @@
 
 <p align="center">
   <img src="Letoslogo.png" alt="LETOS" width="300">
-  <img src="Letosintlogo.png" alt="LETOS compilator" width="300">
+  <img src="IMG_20251024_082828_512.jpg" alt="LETOS compilator" width="300">
 </p>
 
 ## 💸 Поддержать проект
