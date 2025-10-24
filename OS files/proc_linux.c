@@ -397,12 +397,41 @@ int main(int argc, char **argv) {
             case 0x0E: // OUT
                 printf("%c", cpu.AL);
             break;
-
-            case 0xF9:{ //input
-                cpu.AL = getchar();
-                sync_ax_from_al_ah(&cpu);
+            case 0x10:{ // PRINT_STR - вывод строки из памяти
+                uint16_t stroke = cpu.BH + cpu.DS;
+                if (trace){printf("=== DEBUG PRINT_STR ===\n");
+                printf("BH=%02X, DS=%04X, calculated address=%04X\n", cpu.BH, cpu.DS, stroke);
+                printf("Memory dump at %04X: ", stroke);
+                for (int i = 0; i < 6; i++) {
+                    uint32_t addr = (stroke + i) % MEM_SIZE;
+                    uint8_t ch = mem[addr];
+                    printf("[%04X]=%02X(%c) ", addr, ch, (ch >= 32 && ch < 127) ? ch : '.');
+                }
+                printf("\n");}
+                
+                int count = 0;
+                while (count < 100) {
+                    uint32_t addr = stroke % MEM_SIZE;
+                    uint8_t ch = mem[addr];
+                    if (trace){printf("Reading [%04X] = %02X -> ", addr, ch);}
+                    
+                    
+                    if (ch == 0) {
+                        if (trace){printf("END (zero terminator)\n");}
+                        
+                        break;
+                    }
+                    if (trace){printf("output '%c'\n", ch);}
+                    
+                    printf("%c", ch);
+                    stroke++;
+                    count++;
+                    
+                    if (stroke >= MEM_SIZE) break;
+                }
+                if (trace){printf("=== END PRINT_STR ===\n");}
+                
             } break;
-            
             case 0xD0: { // CMP reg1, reg2
                 uint8_t op1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t op2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
