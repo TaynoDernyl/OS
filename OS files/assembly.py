@@ -10,6 +10,7 @@ PC = 0
 mem = [0] * 65536
 valid_save = True
 compile_mode = False
+withfile = False
 
 def sync_ax_to_parts():
     global registers
@@ -30,30 +31,6 @@ def sync_bx_to_parts():
 def sync_parts_to_bx():
     global registers
     registers["BX"] = (registers["BH"] << 8) | registers["BL"]
-
-def load_variables_from_file(comandfile):
-    global mem_for_variable, mem
-    with open(comandfile, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or ":" not in line:
-                continue
-
-            name, rest = line.split(":", 1)
-            name = name.strip()
-
-            pairs = []
-            import re
-            matches = re.findall(r"\(value=(\d+), addr=(\d+)\)", rest)
-            for val, addr in matches:
-                pairs.append([int(val), int(addr)])
-                mem[int(addr)] = int(val)
-                if int(addr) > len(mem):
-                    print("адрес больше памяти")
-                print(mem[int(addr)])    
-            mem_for_variable[name] = pairs
-
-    return mem_for_variable
 
 do_start = True
 new_project = False
@@ -389,65 +366,6 @@ def mov(op1, op2):
     
     return 0 
 
-print(""">Booting compiler...
-================================
-L      EEEEE  TTTTT   OOO   SSSS
-L      E        T    O   O  S
-L      EEE      T    O   O  SSS
-L      E        T    O   O     S
-LLLLL  EEEEE    T     OOO   SSSS version 0.0.4!
-================================""")
-file = input("напишите навзание файла для открытия:")
-print("Trying to create file..")
-if file == "q":
-        do_start = False
-        print("Failed")
-else:           
-    try:
-        if file.endswith(".bin"):
-            binaryd = open(file, "r+b")
-        else:
-            file = (file + ".bin")    
-            binaryd = open(file, "r+b")
-        print("Complite!")    
-    except:
-        print("Failed")
-        if (input("такого файла нет, хотите создать?y/n:")) == "y":
-            if file.endswith(".bin"):
-                binaryd = open(file, "wb+")
-            else:
-                file = (file + ".bin")    
-                binaryd = open(file, "wb+")
-            print("Complite!")    
-        else:        
-            print("Creating temp file..")
-            file = "temp.bin"
-            binaryd = open("temp.bin", "wb+")
-            print("Complite!")
-    print("Work with .swg file..")        
-    new_file = input("вы хотите очистить данные(все данные с файла .swg сотрутся)y/n:")   
-    if new_file == "y" or new_file == "yes":
-        new_project = True   
-    print("вы в файле:", file)  
-    if new_project == False:
-        temp_file = os.path.splitext(file)[0] + ".swg"
-        comandfile = open(temp_file, "a") 
-        load_variables_from_file(temp_file)
-        try:
-            PC_mem = max(addr for values in mem_for_variable.values() for _, addr in values)
-        except:
-            pass
-    else:
-        temp_file = os.path.splitext(file)[0] + ".swg"
-        comandfile = open(temp_file, "w+")  
-        new_project = False
-    print("Ready for work!")    
-    print("введите help для ознакомления")
-    if "===================" in open(temp_file, "r").read():
-        pass
-    else:
-        comandfile.write("===================")
-        comandfile.write("\n")
 
 table_of_reg = {
     "AL": 0, "AH": 1, "BL": 2, "BH": 3, "AX": 4, "BX": 5, "DS": 6, "CS": 7,
@@ -588,15 +506,14 @@ def parse_number(s):
         return s
 
 def switch(incode, operrand=None, operrand2=None):
-    global file, comandfile, do_start, valid_save, mem, PC
-    global binaryd, PC_mem, mem_for_variable, temp_file, commands, compile_mode
+    global file, do_start, valid_save, mem, PC
+    global binaryd, PC_mem, mem_for_variable, commands, compile_mode
     
     # Обработка меток
     if incode.endswith(':'):
         label_name = incode[:-1]
         mem_for_variable[label_name] = [["label", PC]]
         commands.append(incode)
-        comandfile.write(f"{incode}\n")
         return
         
     # Список валидных команд для компиляции (только те, что генерируют код)
@@ -617,12 +534,6 @@ def switch(incode, operrand=None, operrand2=None):
             commands.append(f"{incode} {operrand}")
         else:  # если оба пустые
             commands.append(incode)
-        
-    # Запись в .swg файл
-    if operrand != None:
-        comandfile.write(f"{incode} {operrand} {operrand2}\n")
-    else:
-        comandfile.write(f"{incode}\n")   
         
     # Компиляция
     if incode == "compile":
@@ -705,9 +616,6 @@ com - показать список команд для компиляции
         temp = input("y/n:")
         if temp == "y" or temp == "Y" or temp == "yes":
             binaryd.truncate(0)
-            comandfile.close()
-            comandfile = open(temp_file, "w+")
-            comandfile.write("===================\n")
             commands.clear()
             labels.clear()
             print("удалено")
@@ -723,19 +631,6 @@ com - показать список команд для компиляции
     elif incode == "q":
         binaryd.seek(0, 2)
         print("Thank you for using Letos;)")
-        for name, value in mem_for_variable.items():
-            if name in open(temp_file, "r").read():
-                pass
-            else:
-                comandfile.write("\n")
-                if isinstance(value[0], int):
-                    val, addr = value
-                    comandfile.write(f"{name}: value={val}, address={addr}")
-                else:
-                    comandfile.write(f"{name}: ")
-                    for val, addr in value:
-                        comandfile.write(f"(value={val}, addr={addr}) ")   
-        comandfile.write("\n")            
         do_start = False    
     elif incode == "f" or incode == "stop":
         valid_save = False
@@ -826,6 +721,7 @@ com - показать список команд для компиляции
             # не добавляются в commands и не считаются ошибкой
             pass
         return
+
 def variable(name, data, oper):
     global registers, PC_mem, mem_for_variable
 
@@ -883,30 +779,122 @@ def variable(name, data, oper):
             mem_for_variable[name] = [int(data), PC_mem+registers["DS"]]
 
     return
-def start():
-    global valid_save, do_start
-    if valid_save == True:
-        ans = input("---:")
-    else:
-        ans = input("***:")
+
+def start(ans=None):
+    global valid_save, do_start, withfile
+    
+    if ans is None:
+        if valid_save:
+            ans = input("---:")
+        else:
+            ans = input("***:")
+    
     parts = ans.split()
     command = parts[0] if parts else ""
+    
     if command == "q":
         switch("compile")
         do_start = False
         return
+        
     if len(parts) == 1:
         switch(command)
     elif len(parts) == 2:
         opperand = parts[1]
         switch(command, opperand)   
-    if len(parts) >= 3:
+    elif len(parts) >= 3:
         opperand = parts[1]
         opperand2 = parts[2]    
         switch(command, opperand, opperand2)   
            
-    while do_start:
-        start()
+    # Не запускаем цикл при работе с файлом
+    if do_start and not withfile:
+        while do_start:
+            start()
+
+if len(sys.argv) > 1:
+    new_project = True
+    withfile = True
+    comandfile = sys.argv[1]
+    
+    # Правильное определение имени бинарного файла
+    binfile = os.path.splitext(comandfile)[0] + ".bin"
+    
+    try:
+        # Открываем или создаем бинарный файл
+        if os.path.exists(binfile):
+            binaryd = open(binfile, "r+b")
+        else:
+            binaryd = open(binfile, "wb+")
+            
+        # Читаем команды из файла
+        with open(comandfile, "r", encoding="utf-8") as code:
+            for line_num, line in enumerate(code, 1):
+                line = line.strip()
+                if not line or line.startswith(';') or line.startswith('#'):
+                    continue
+                print(f"Обрабатываем строку {line_num}: {line}")
+                start(line)
+            
+            # Автоматически компилируем и завершаем после обработки всех команд
+            switch("compile")
+            print("Компиляция завершена автоматически после обработки файла")
+        
+        binaryd.close()
+        do_start = False
+        
+    except Exception as e:
+        print(f"Ошибка загрузки файла: {e}")
+        do_start = False
+else:    
+    print(""">Booting compiler...
+    ================================
+    L      EEEEE  TTTTT   OOO   SSSS
+    L      E        T    O   O  S
+    L      EEE      T    O   O  SSS
+    L      E        T    O   O     S
+    LLLLL  EEEEE    T     OOO   SSSS version 0.0.4!
+    ================================""")
+    file = input("напишите навзание файла для открытия:")
+    print("Trying to create file..")
+    if file == "q":
+            do_start = False
+            print("Failed")
+    else:           
+        try:
+            if file.endswith(".bin"):
+                binaryd = open(file, "r+b")
+            else:
+                file = (file + ".bin")    
+                binaryd = open(file, "r+b")
+            print("Complite!")    
+        except:
+            print("Failed")
+            if (input("такого файла нет, хотите создать?y/n:")) == "y":
+                if file.endswith(".bin"):
+                    binaryd = open(file, "wb+")
+                else:
+                    file = (file + ".bin")    
+                    binaryd = open(file, "wb+")
+                print("Complite!")    
+            else:        
+                print("Creating temp file..")
+                file = "temp.bin"
+                binaryd = open("temp.bin", "wb+")
+                print("Complite!")
+        print("Work with .swg file..")        
+        new_file = input("вы хотите очистить данные(все данные с файла .swg сотрутся)y/n:")   
+        if new_file == "y" or new_file == "yes":
+            new_project = True   
+        print("вы в файле:", file)  
+        print("Ready for work!")    
+        print("введите help для ознакомления")
+    
+    # Убрана работа с .swg файлом
+    try:
+        PC_mem = max(addr for values in mem_for_variable.values() for _, addr in values)
+    except:
+        pass
 
 if do_start:
     start()
