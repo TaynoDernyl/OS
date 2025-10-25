@@ -252,7 +252,7 @@ int main(int argc, char **argv) {
                         mem[(addr + 1) % MEM_SIZE + cpu.DS] = (cpu.CS >> 8) & 0xFF;
                         break;    
                     default:
-                        fprintf(stderr, "Invalid reg %u in STORE\n", reg);
+                        mem[addr % MEM_SIZE + cpu.DS] = reg;
                         break;
                 }
                 if (trace) {
