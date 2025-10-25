@@ -111,6 +111,8 @@ def compile_all():
         # Компиляция команд
         
         if opcode == 'mov':
+            if operand2 in mem_for_variable:
+                operand2 = mem_for_variable[operand2][0][1]
             compile_mov(operand1, operand2)
             current_address += 4
         elif opcode == 'printstr':
@@ -176,11 +178,24 @@ def compile_mov(op1, op2):
         binaryd.write(struct.pack("<B", flag))
         binaryd.write(struct.pack("<B", reg1_code))
         
-        value = parse_operand(op2)
+        # Преобразуем в строку, если это число
+        if isinstance(op2, int):
+            op2 = str(op2)
+            value = parse_operand(op2)
+            value -= registers["DS"]
+        else:
+            value = parse_number(op2)
+
         if flag == 1:
+            # 16-битные регистры
             binaryd.write(struct.pack("<H", value))
         else:
+            # 8-битные регистры - проверяем переполнение
+            if value > 255:
+                print(f"Ошибка: значение {value} слишком большое для 8-битного регистра {reg1_name}")
+                return
             binaryd.write(struct.pack("<B", value))
+            
     except Exception as e:
         print(f"Ошибка компиляции mov: {e}")
 
@@ -245,7 +260,7 @@ def compile_store(op1, op2):
             print(f"DEBUG COMPILE: STORE [{op1}], значение {op2}")
             print(f"  Код: 05 00 {int(op1):04X}h")
             binaryd.write(struct.pack("<B", 0x05))
-            binaryd.write(struct.pack("<B", 0x00))  # 0 означает "значение"
+            binaryd.write(struct.pack("<B", int(op2)))  # 0 означает "значение"
             binaryd.write(struct.pack("<H", int(op1)))
     except Exception as e:
         print(f"Ошибка компиляции store: {e}")
@@ -294,10 +309,12 @@ def compile_print_str():
 def parse_operand(operand):
     if operand is None:
         return 0
-    
     if operand in labels:
         return labels[operand]
-    
+    if operand in mem_for_variable:
+        # Для компиляции возвращаем абсолютный адрес
+        # Вычитание DS будет происходить во время выполнения
+        return mem_for_variable[operand][0][1]
     try:
         if operand.startswith("0x") or operand.startswith("0X"):
             return int(operand, 16)
@@ -354,7 +371,11 @@ def mov(op1, op2):
             registers[reg1_name] = value
             print(f"{reg1_name} = {value}")
         except:
-            print(f"Ошибка: неверный второй операнд {op2}")
+            if op2 in mem_for_variable:
+                registers[reg1_name] = mem_for_variable[op2][0][1]-registers["DS"]
+                print(f"{reg1_name} = {mem_for_variable[op2][0][1]-registers["DS"]}")
+                return 0
+            print(f"Ошибка: неверный второй операнд {op2}(если вы указали переменную данная ошибка дефолт)")
             return 1
     
     if reg1_code == 4:
@@ -368,7 +389,14 @@ def mov(op1, op2):
     
     return 0 
 
-print("> BOOT LETOS INTERPRETATOR v0.0.3\n===================\n|Start your work:)|\n===================")
+print(""">Booting compiler...
+================================
+L      EEEEE  TTTTT   OOO   SSSS
+L      E        T    O   O  S
+L      EEE      T    O   O  SSS
+L      E        T    O   O     S
+LLLLL  EEEEE    T     OOO   SSSS version 0.0.4!
+================================""")
 file = input("напишите навзание файла для открытия:")
 print("Trying to create file..")
 if file == "q":
@@ -612,7 +640,7 @@ load — загружает значение из памяти в регистр
 clear — очищает файлы программы
 q — завершает программу
 f / stop — конец программы
-mov — перемещение данных
+mov — перемещение данных(числа загружаются только больше 7!!! т.к. до 7 это номера регистров)
 compile - выполняет двухэтапную компиляцию
 jmp — безусловный переход
 jz — переход при нуле
