@@ -63,7 +63,7 @@ def compile_all():
                     current_address += 3
                 elif opcode in ['inc', 'dec']:
                     current_address += 2
-                elif opcode in ['print', 'input', 'f', 'stop']:
+                elif opcode in ['print', 'input', 'f', 'stop', 'printstr']:
                     current_address += 1
 
     # Второй проход - генерация кода
@@ -125,7 +125,7 @@ def compile_all():
         elif opcode == 'comp':
             compile_comp(operand1, operand2)
             current_address += 3
-        elif opcode == 'print':
+        elif opcode == 'print' or opcode == 'printstr':
             compile_print()
             current_address += 1
         elif opcode == 'input':
@@ -890,6 +890,8 @@ else:
         new_file = input("вы хотите очистить данные(все данные с файла .swg сотрутся)y/n:")   
         if new_file == "y" or new_file == "yes":
             new_project = True   
+        temp_file = file[:-4]    
+        swgfile = open(temp_file+".swg", "+a")
         print("вы в файле:", file)  
         print("Ready for work!")    
         print("введите help для ознакомления")
