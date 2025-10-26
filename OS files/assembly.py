@@ -168,6 +168,8 @@ def compile_mov(op1, op2):
             binaryd.write(struct.pack("<H", value))
         else:
             # 8-битные регистры - проверяем переполнение
+            if valid_of_reg(value) != -1:
+                value = valid_of_reg(value)
             if value > 255:
                 print(f"Ошибка: значение {value} слишком большое для 8-битного регистра {reg1_name}")
                 return
@@ -284,6 +286,8 @@ def compile_print_str():
         print(f"Ошибка компиляции print_str: {e}")
 
 def parse_operand(operand):
+    if valid_of_reg(operand)!= -1:
+        return valid_of_reg(operand)
     if operand is None:
         return 0
     if operand in labels:
