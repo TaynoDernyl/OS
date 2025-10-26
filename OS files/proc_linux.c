@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 
 #define MEM_SIZE 65536   // <- исправлено: 2^16
@@ -40,6 +42,17 @@ static inline void sync_bl_bh_from_bx(CPU *cpu) {
     cpu->BH = (cpu->BX >> 8) & 0xFF;
 }
 
+int set_nonblocking(int enable) {
+    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    if (flags == -1) return -1;
+    
+    if (enable)
+        flags |= O_NONBLOCK;
+    else
+        flags &= ~O_NONBLOCK;
+        
+    return fcntl(STDIN_FILENO, F_SETFL, flags);
+}
 
 static uint8_t mem[MEM_SIZE];
 
@@ -470,7 +483,14 @@ int main(int argc, char **argv) {
                 }
             } break;
    
-
+            case 0xF9:{ //input
+                fflush(stdout);
+                system("stty raw -echo");  // отключаем буферизацию и эхо
+                int ch = getchar();
+                system("stty cooked echo"); // восстанавливаем
+                cpu.AL = ch;
+                sync_ax_from_al_ah(&cpu);
+            } break;
             case 0xFF: // HALT
                 if (trace) printf("HALT\n");
                 return 0;
