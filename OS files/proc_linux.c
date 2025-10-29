@@ -4,7 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-
+#include "videocardemu.h"
 
 #define MEM_SIZE 65536   // <- исправлено: 2^16
 
@@ -77,7 +77,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0x20, 0x01, 0x07, 0x10, 0x00, 0x20, 0x00, 0x00, 0x0A, 0x05, 0x00, 0x09, 0x00, 0x04, 0x02, 0x09, 0x00, 0xFF};
+    uint8_t demo[] = {0x30,0x28,0x14,0xFF,0x31,0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     printf("Welcome to Letos 0.0.3!\n");
     int trace = 0;
     const char *prog = NULL;
-
+    vga_init();
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--trace") == 0) trace = 1;
         else prog = argv[i];
@@ -95,7 +95,6 @@ int main(int argc, char **argv) {
     if (prog) load_binary(prog); else load_demo_program();
 
     CPU cpu = {.PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0, .BH = 0, .AX = 0, .BX = 0, .DS = 0x1000, .CS = 0};
-
     for (;;) {
         uint8_t op = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
         if (trace) {
@@ -104,6 +103,24 @@ int main(int argc, char **argv) {
         }
         
         switch (op) {
+            case 0x30: {
+                uint8_t x = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                uint8_t y = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                uint8_t reg = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                switch(reg){
+                    case REG_AL: vga_set_pixel(x, y, cpu.AL); break;
+                    case REG_AH: vga_set_pixel(x, y, cpu.AH); break;
+                    case REG_BL: vga_set_pixel(x, y, cpu.BL); break;
+                    case REG_BH: vga_set_pixel(x, y, cpu.BH); break;
+                    case REG_AX: vga_set_pixel(x, y, cpu.AX); break;
+                    case REG_BX: vga_set_pixel(x, y, cpu.BX); break;
+                    default: vga_set_pixel(x, y, reg);
+                };
+                if (trace) printf("set pixel in %2X, %2X = %2X", x, y, reg);
+            }break;
+            case 0x31: {
+                vga_render();
+            }break;
             case 0x20: {
                 uint8_t flags = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t dst = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
