@@ -4,7 +4,7 @@
 static uint8_t screen[HEIGHT][WIDTH];
 
 // Символы для псевдографики (от тёмного к светлому)
-static const char* grayscale = " .:-=+*#%@";
+static const char* grayscale = " $.:-=+*#%@";
 
 void vga_init() {
     for(int y=0; y<HEIGHT; y++)
@@ -26,11 +26,11 @@ void vga_render() {
     
     for(int y=0; y<HEIGHT; y++) {
         for(int x=0; x<WIDTH; x++) {
-            // Преобразуем цвет (0-255) в символ (0-9)
-            int color_idx = screen[y][x] * 9 / 255;
+            // Преобразуем цвет (0-255) в символ (0-10)
+            int color_idx = screen[y][x] * 10 / 255;
             printf("%c", grayscale[color_idx]);
         }
         printf("\n");
     }
-    printf("=== VGA Display ===\n");
+    printf("VGA\n");
 }
