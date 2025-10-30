@@ -2,7 +2,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <conio.h>
+#include "videocardemu.h"
 
 #define MEM_SIZE 65536   // <- исправлено: 2^16
 
@@ -40,7 +43,6 @@ static inline void sync_bl_bh_from_bx(CPU *cpu) {
     cpu->BH = (cpu->BX >> 8) & 0xFF;
 }
 
-
 static uint8_t mem[MEM_SIZE];
 
 static uint16_t rd16(CPU *cpu){ //читаем 16 битное число (безопасно по модулю MEM_SIZE)
@@ -64,7 +66,17 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0x20, 0x01, 0x07, 0x10, 0x00, 0x20, 0x00, 0x00, 0x0A, 0x05, 0x00, 0x09, 0x00, 0x04, 0x02, 0x09, 0x00, 0xFF};
+    uint8_t demo[] = {0x30,1,1,0x20,0x30,1,2,0x20,0x30,1,3,0x20,0x30,1,4,0x20,0x30,1,5,0x20,0x30,2,5,0x20,0x30,3,5,0x20,0x30,4,5,0x20,0x30,5,5,0x20,
+// E (0x40)
+0x30,7,1,0x40,0x30,7,2,0x40,0x30,7,3,0x40,0x30,7,4,0x40,0x30,7,5,0x40,0x30,8,1,0x40,0x30,9,1,0x40,0x30,10,1,0x40,0x30,8,3,0x40,0x30,9,3,0x40,0x30,10,3,0x40,0x30,8,5,0x40,0x30,9,5,0x40,0x30,10,5,0x40,
+// T (0x60)
+0x30,12,1,0x60,0x30,13,1,0x60,0x30,14,1,0x60,0x30,15,1,0x60,0x30,16,1,0x60,0x30,14,2,0x60,0x30,14,3,0x60,0x30,14,4,0x60,0x30,14,5,0x60,
+// O (0x80)
+0x30,18,1,0x80,0x30,19,1,0x80,0x30,20,1,0x80,0x30,21,1,0x80,0x30,22,1,0x80,0x30,18,2,0x80,0x30,22,2,0x80,0x30,18,3,0x80,0x30,22,3,0x80,0x30,18,4,0x80,0x30,22,4,0x80,0x30,18,5,0x80,0x30,19,5,0x80,0x30,20,5,0x80,0x30,21,5,0x80,0x30,22,5,0x80,
+// S (0xA0)
+0x30,24,1,0xA0,0x30,25,1,0xA0,0x30,26,1,0xA0,0x30,27,1,0xA0,0x30,28,1,0xA0,0x30,24,2,0xA0,0x30,24,3,0xA0,0x30,25,3,0xA0,0x30,26,3,0xA0,0x30,27,3,0xA0,0x30,28,3,0xA0,0x30,28,4,0xA0,0x30,24,5,0xA0,0x30,25,5,0xA0,0x30,26,5,0xA0,0x30,27,5,0xA0,0x30,28,5,0xA0,
+// render + halt
+0x31,0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -73,7 +85,7 @@ int main(int argc, char **argv) {
     printf("Welcome to Letos 0.0.3!\n");
     int trace = 0;
     const char *prog = NULL;
-
+    vga_init();
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--trace") == 0) trace = 1;
         else prog = argv[i];
@@ -91,6 +103,24 @@ int main(int argc, char **argv) {
         }
         
         switch (op) {
+            case 0x30: {
+                uint8_t x = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                uint8_t y = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                uint8_t reg = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                switch(reg){
+                    case REG_AL: vga_set_pixel(x, y, cpu.AL); break;
+                    case REG_AH: vga_set_pixel(x, y, cpu.AH); break;
+                    case REG_BL: vga_set_pixel(x, y, cpu.BL); break;
+                    case REG_BH: vga_set_pixel(x, y, cpu.BH); break;
+                    case REG_AX: vga_set_pixel(x, y, cpu.AX); break;
+                    case REG_BX: vga_set_pixel(x, y, cpu.BX); break;
+                    default: vga_set_pixel(x, y, reg);
+                };
+                if (trace) printf("set pixel in %2X, %2X = %2X", x, y, reg);
+            }break;
+            case 0x31: {
+                vga_render();
+            }break;
             case 0x20: {
                 uint8_t flags = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t dst = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
@@ -252,7 +282,7 @@ int main(int argc, char **argv) {
                         mem[(addr + 1) % MEM_SIZE + cpu.DS] = (cpu.CS >> 8) & 0xFF;
                         break;    
                     default:
-                        fprintf(stderr, "Invalid reg %u in STORE\n", reg);
+                        mem[addr % MEM_SIZE + cpu.DS] = reg;
                         break;
                 }
                 if (trace) {
@@ -397,12 +427,41 @@ int main(int argc, char **argv) {
             case 0x0E: // OUT
                 printf("%c", cpu.AL);
             break;
-
-            case 0xF9:{ //input
-                cpu.AL = getch();
-                sync_ax_from_al_ah(&cpu);
+            case 0x10:{ // PRINT_STR - вывод строки из памяти
+                uint16_t stroke = cpu.BH + cpu.DS;
+                if (trace){printf("=== DEBUG PRINT_STR ===\n");
+                printf("BH=%02X, DS=%04X, calculated address=%04X\n", cpu.BH, cpu.DS, stroke);
+                printf("Memory dump at %04X: ", stroke);
+                for (int i = 0; i < 6; i++) {
+                    uint32_t addr = (stroke + i) % MEM_SIZE;
+                    uint8_t ch = mem[addr];
+                    printf("[%04X]=%02X(%c) ", addr, ch, (ch >= 32 && ch < 127) ? ch : '.');
+                }
+                printf("\n");}
+                
+                int count = 0;
+                while (count < 100) {
+                    uint32_t addr = stroke % MEM_SIZE;
+                    uint8_t ch = mem[addr];
+                    if (trace){printf("Reading [%04X] = %02X -> ", addr, ch);}
+                    
+                    
+                    if (ch == 0) {
+                        if (trace){printf("END (zero terminator)\n");}
+                        
+                        break;
+                    }
+                    if (trace){printf("output '%c'\n", ch);}
+                    
+                    printf("%c", ch);
+                    stroke++;
+                    count++;
+                    
+                    if (stroke >= MEM_SIZE) break;
+                }
+                if (trace){printf("=== END PRINT_STR ===\n");}
+                
             } break;
-            
             case 0xD0: { // CMP reg1, reg2
                 uint8_t op1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t op2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
@@ -441,7 +500,11 @@ int main(int argc, char **argv) {
                 }
             } break;
    
-
+            case 0xF9:{ //input
+                int ch = getch();
+                cpu.AL = ch;
+                sync_ax_from_al_ah(&cpu);
+            } break;
             case 0xFF: // HALT
                 if (trace) printf("HALT\n");
                 return 0;
