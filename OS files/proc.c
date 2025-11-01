@@ -82,7 +82,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0x20,0x00,0x08,0x09,0x20,0x00,0x09,0x08,0x30,1,1,0x20,0x30,1,2,0x20,0x30,1,3,0x20,0x30,1,4,0x20,0x30,1,5,0x20,0x30,2,5,0x20,0x30,3,5,0x20,0x30,4,5,0x20,0x30,5,5,0x20,
+    uint8_t demo[] = {0xF9,0x20,0x00,0x08,0x09,0x20,0x00,0x09,0x08,0x30,1,1,0x20,0x30,1,2,0x20,0x30,1,3,0x20,0x30,1,4,0x20,0x30,1,5,0x20,0x30,2,5,0x20,0x30,3,5,0x20,0x30,4,5,0x20,0x30,5,5,0x20,
 // E (0x40)
 0x30,7,1,0x40,0x30,7,2,0x40,0x30,7,3,0x40,0x30,7,4,0x40,0x30,7,5,0x40,0x30,8,1,0x40,0x30,9,1,0x40,0x30,10,1,0x40,0x30,8,3,0x40,0x30,9,3,0x40,0x30,10,3,0x40,0x30,8,5,0x40,0x30,9,5,0x40,0x30,10,5,0x40,
 // T (0x60)
@@ -580,6 +580,94 @@ int main(int argc, char **argv) {
                 }
             } break;
    
+            case 0xD1: { // < reg1, reg2
+                uint8_t op1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                uint8_t op2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                uint16_t val1 = 0, val2 = 0;
+
+                // читаем первое значение
+                switch (op1) {
+                    case REG_AL: val1 = cpu.AL; break;
+                    case REG_AH: val1 = cpu.AH; break;
+                    case REG_BL: val1 = cpu.BL; break;
+                    case REG_BH: val1 = cpu.BH; break;
+                    case REG_CX: val1 = cpu.CX; break;
+                    case REG_PX: val1 = cpu.PX; break;
+                    case REG_PY: val1 = cpu.PY; break;
+                    case REG_AX: val1 = cpu.AX; break;
+                    case REG_BX: val1 = cpu.BX; break;
+                    default:
+                        val1 = op1; // если не регистр — считать числом
+                        break;
+                }
+
+                // читаем второе значение
+                switch (op2) {
+                    case REG_AL: val2 = cpu.AL; break;
+                    case REG_AH: val2 = cpu.AH; break;
+                    case REG_BL: val2 = cpu.BL; break;
+                    case REG_BH: val2 = cpu.BH; break;
+                    case REG_CX: val2 = cpu.CX; break;
+                    case REG_PX: val2 = cpu.PX; break;
+                    case REG_PY: val2 = cpu.PY; break;
+                    case REG_AX: val2 = cpu.AX; break;
+                    case REG_BX: val2 = cpu.BX; break;
+                    default:
+                        val2 = op2;
+                        break;
+                }
+
+                cpu.Z = (val1 < val2);
+
+                if (trace) {
+                    printf("%u < %u -> Z=%u\n", val1, val2, cpu.Z);
+                }
+            } break;
+
+            case 0xD2: { // > reg1, reg2
+                uint8_t op1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                uint8_t op2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                uint16_t val1 = 0, val2 = 0;
+
+                // читаем первое значение
+                switch (op1) {
+                    case REG_AL: val1 = cpu.AL; break;
+                    case REG_AH: val1 = cpu.AH; break;
+                    case REG_BL: val1 = cpu.BL; break;
+                    case REG_BH: val1 = cpu.BH; break;
+                    case REG_CX: val1 = cpu.CX; break;
+                    case REG_PX: val1 = cpu.PX; break;
+                    case REG_PY: val1 = cpu.PY; break;
+                    case REG_AX: val1 = cpu.AX; break;
+                    case REG_BX: val1 = cpu.BX; break;
+                    default:
+                        val1 = op1; // если не регистр — считать числом
+                        break;
+                }
+
+                // читаем второе значение
+                switch (op2) {
+                    case REG_AL: val2 = cpu.AL; break;
+                    case REG_AH: val2 = cpu.AH; break;
+                    case REG_BL: val2 = cpu.BL; break;
+                    case REG_BH: val2 = cpu.BH; break;
+                    case REG_CX: val2 = cpu.CX; break;
+                    case REG_PX: val2 = cpu.PX; break;
+                    case REG_PY: val2 = cpu.PY; break;
+                    case REG_AX: val2 = cpu.AX; break;
+                    case REG_BX: val2 = cpu.BX; break;
+                    default:
+                        val2 = op2;
+                        break;
+                }
+
+                cpu.Z = (val1 > val2);
+
+                if (trace) {
+                    printf("%u > %u -> Z=%u\n", val1, val2, cpu.Z);
+                }
+            } break;
+            
             case 0xF9:{ //input
                 int ch = getch();
                 cpu.AL = ch;
