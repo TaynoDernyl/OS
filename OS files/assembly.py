@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import struct
 import threading 
 import os
@@ -69,7 +68,7 @@ def compile_all():
             if cmd_parts and cmd_parts[0] != 'compile':  # Пропускаем команду compile
                 opcode = cmd_parts[0]
                 # Подсчет размера команды
-                if opcode in ['mov', 'store', 'load']:
+                if opcode in ['mov', 'store', 'load', 'setv']:
                     current_address += 4
                 elif opcode in ['jmp', 'jz', 'jnz']:
                     current_address += 3
@@ -77,7 +76,7 @@ def compile_all():
                     current_address += 3
                 elif opcode in ['inc', 'dec']:
                     current_address += 2
-                elif opcode in ['print', 'input', 'f', 'stop', 'printstr']:
+                elif opcode in ['print', 'input', 'f', 'stop', 'printstr', 'render', 'init']:
                     current_address += 1
 
     # Второй проход - генерация кода
@@ -96,7 +95,8 @@ def compile_all():
         opcode = cmd_parts[0]
         operand1 = cmd_parts[1] if len(cmd_parts) > 1 else None
         operand2 = cmd_parts[2] if len(cmd_parts) > 2 else None
-        
+        operand3 = cmd_parts[3] if len(cmd_parts) > 3 else None
+
         print(f"Компиляция: {command} по адресу {current_address}")
         
         # Компиляция команд
@@ -108,7 +108,16 @@ def compile_all():
             current_address += 4
         elif opcode == 'printstr':
             compile_print_str()
-            current_address += 1    
+            current_address += 1  
+        elif opcode == 'setv':
+            compile_set_VGA(operand1, operand2, operand3)      
+            current_address += 4
+        elif opcode == 'init':
+            compile_init()
+            current_address += 1
+        elif opcode == 'render':
+            compile_render()
+            current_address += 1        
         elif opcode == 'jmp':
             compile_jump('jmp', operand1)
             current_address += 3
@@ -139,6 +148,12 @@ def compile_all():
         elif opcode == 'comp':
             compile_comp(operand1, operand2)
             current_address += 3
+        elif opcode == '<':
+            compile_less(operand1, operand2)
+            current_address += 4    
+        elif opcode == '>':
+            compile_greater(operand1, operand2)
+            current_address += 4        
         elif opcode == 'print' or opcode == 'printstr':
             compile_print()
             current_address += 1
@@ -240,6 +255,18 @@ def compile_dec(op1):
     except Exception as e:
         print(f"Ошибка компиляции dec: {e}")
 
+def compile_init():
+    try:
+        binaryd.write(struct.pack("<B", 0x32))
+    except Exception as e:
+        print(f"Ошибка компиляции dec: {e}")
+
+def compile_render():
+    try:
+        binaryd.write(struct.pack("<B", 0x31))
+    except Exception as e:
+        print(f"Ошибка компиляции dec: {e}")
+
 def compile_store(op1, op2):
     try:
         reg_code = valid_of_reg(op2)
@@ -276,6 +303,22 @@ def compile_comp(op1, op2):
     except Exception as e:
         print(f"Ошибка компиляции comp: {e}")
 
+def compile_less(op1, op2):
+    try:
+        binaryd.write(struct.pack("<B", 0xD1))
+        binaryd.write(struct.pack("<B", valid_of_reg(op1)))
+        binaryd.write(struct.pack("<B", valid_of_reg(op2)))
+    except Exception as e:
+        print(f"Ошибка компиляции comp: {e}")
+
+def compile_greater(op1, op2):
+    try:
+        binaryd.write(struct.pack("<B", 0xD2))
+        binaryd.write(struct.pack("<B", valid_of_reg(op1)))
+        binaryd.write(struct.pack("<B", valid_of_reg(op2)))
+    except Exception as e:
+        print(f"Ошибка компиляции comp: {e}")
+
 def compile_print():
     try:
         binaryd.write(struct.pack("<B", 0x0E))
@@ -295,9 +338,45 @@ def compile_stop():
         print(f"Ошибка компиляции stop: {e}")
 def compile_print_str():
     try:
-        binaryd.write(struct.pack("<B", 0x10))  # Новый код операции
+        binaryd.write(struct.pack("<B", 0x10))  
     except Exception as e:
         print(f"Ошибка компиляции print_str: {e}")
+
+def compile_set_VGA(x,y,color):
+    try:
+        binaryd.write(struct.pack("<B", 0x30))  
+    except Exception as e:
+        print(f"Ошибка компиляции print_str: {e}")
+    if isinstance(x, str):
+        try:
+            x = int(x)
+        except:
+            if x in registers:
+                x = registers[x]
+            else:
+                print("Ошибка компиляции set_VGA, регистр X не найден")
+                return
+    if isinstance(y, str):
+        try:
+            y = int(y)
+        except:
+            if y in registers:
+                y = registers[x]
+            else:
+                print("Ошибка компиляции set_VGA, регистр Y не найден")
+                return
+    if isinstance(color, str):
+        try:
+            color = int(color)
+        except:
+            if color in registers:
+                color = registers[color]
+            else:
+                print("Ошибка компиляции set_VGA, регистр color не найден")    
+                return    
+    binaryd.write(struct.pack("<B", x))      
+    binaryd.write(struct.pack("<B", y))        
+    binaryd.write(struct.pack("<B", color))   
 
 def parse_operand(operand):
     if valid_of_reg(operand)!= -1:
@@ -386,13 +465,25 @@ def mov(op1, op2):
 
 
 table_of_reg = {
-    "AL": 0, "AH": 1, "BL": 2, "BH": 3, "AX": 4, "BX": 5, "DS": 6, "CS": 7,
-    "al": 0, "ah": 1, "bl": 2, "bh": 3, "ax": 4, "bx": 5, "ds": 6, "cs": 7,
-    0: "AL", 1: "AH", 2: "BL", 3: "BH", 4: "AX", 5: "BX", 6: "DS", 7: "CS"
+    # --- 8-битные регистры ---
+    "AL": 0, "AH": 1, "BL": 2, "BH": 3,
+
+    # --- 16-битные и спецрегистры ---
+    "AX": 4, "BX": 5, "DS": 6, "CS": 7, "CX": 8, "PX": 9, "PY": 10,
+
+    # --- нижний регистр для удобства ---
+    "al": 0, "ah": 1, "bl": 2, "bh": 3,
+    "ax": 4, "bx": 5, "ds": 6, "cs": 7, "cx": 8, "px": 9, "py": 10,
+
+    # --- обратное отображение (индекс -> имя) ---
+    0: "AL", 1: "AH", 2: "BL", 3: "BH",
+    4: "AX", 5: "BX", 6: "DS", 7: "CS",
+    8: "CX", 9: "PX", 10: "PY"
 }
 
+
 registers = {
-    "AL": 0, "AH": 0, "BL": 0, "BH": 0, "AX": 0, "BX": 0, "DS": 4096, "CS": 0
+    "AL": 0, "AH": 0, "BL": 0, "BH": 0, "AX": 0, "BX": 0, "DS": 4096, "CS": 0, "CX": 0, "PX": 0, "PY": 0
 }
 
 def save_out():
@@ -450,7 +541,6 @@ def dec(op1):
     elif reg_name == "BL" or reg_name == "BH":
         sync_parts_to_bx()
     return
-
 def add(reg1, reg2):
     global table_of_reg, registers
     reg1_code = valid_of_reg(reg1)
@@ -523,7 +613,7 @@ def parse_number(s):
     except ValueError:
         return s
 
-def switch(incode, operrand=None, operrand2=None):
+def switch(incode, operrand=None, operrand2=None, operrand3=None):
     global file, do_start, valid_save, mem, PC
     global binaryd, PC_mem, mem_for_variable, commands, compile_mode
     
@@ -537,7 +627,7 @@ def switch(incode, operrand=None, operrand2=None):
     # Список валидных команд для компиляции (только те, что генерируют код)
     valid_compile_commands = [
         'store', 'load', 'mov', 'jmp', 'jz', 'jnz', 'add', 'sub', 
-        'inc', 'dec', 'print', 'comp', 'input', 'f', 'stop', 'printstr'
+        'inc', 'dec', 'print', 'comp', 'input', 'f', 'stop', 'printstr', '<', '>', 'init', 'render', 'setv'
     ]
     
     # Проверка валидности команды (только для компилируемых команд)
@@ -546,7 +636,9 @@ def switch(incode, operrand=None, operrand2=None):
         pass
     else:
         # Добавление команды в список для компиляции
-        if operrand and operrand2:  # если оба не пустые/не None
+        if operrand and operrand2 and operrand3: #если все не пустые
+            commands.append(f"{incode} {operrand} {operrand2} {operrand3}")
+        elif operrand and operrand2:  # если оба не пустые/не None
             commands.append(f"{incode} {operrand} {operrand2}")
         elif operrand:  # если только operrand не пустой
             commands.append(f"{incode} {operrand}")
@@ -586,6 +678,21 @@ com - показать список команд для компиляции
 ***: - файл не сохранен""")
         return    
     elif incode == "printstr":
+        valid_save = False
+        return
+    elif incode == "setv":
+        valid_save = False
+        return
+    elif incode == "<":
+        valid_save = False
+        return
+    elif incode == ">":
+        valid_save = False
+        return
+    elif incode == "render":
+        valid_save = False
+        return
+    elif incode == "init":
         valid_save = False
         return
     elif incode == "store":
@@ -820,10 +927,15 @@ def start(ans=None):
     elif len(parts) == 2:
         opperand = parts[1]
         switch(command, opperand)   
-    elif len(parts) >= 3:
+    elif len(parts) == 3:
         opperand = parts[1]
         opperand2 = parts[2]    
         switch(command, opperand, opperand2)   
+    elif len(parts) == 4:
+        opperand = parts[1]
+        opperand2 = parts[2]    
+        operrand3 = parts[3]    
+        switch(command, opperand, opperand2, operrand3)       
            
     # Не запускаем цикл при работе с файлом
     if do_start and not withfile:
