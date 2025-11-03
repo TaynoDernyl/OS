@@ -298,8 +298,23 @@ def compile_load(op1, op2):
 def compile_comp(op1, op2):
     try:
         binaryd.write(struct.pack("<B", 0xD0))
-        binaryd.write(struct.pack("<B", valid_of_reg(op1)))
-        binaryd.write(struct.pack("<B", valid_of_reg(op2)))
+        if valid_of_reg(op1) == -1:
+            try:
+                op1 = ord(op1)
+            except:
+                op1 = int(op1)
+        else:
+            op1 = valid_of_reg(op1)
+        if valid_of_reg(op2) == -1:
+            try:
+                op2 = ord(op2)
+            except:
+                op2 = int(op2)
+        else:
+            op2 = valid_of_reg(op2)
+
+        binaryd.write(struct.pack("<B", op1))
+        binaryd.write(struct.pack("<B", op2))
     except Exception as e:
         print(f"Ошибка компиляции comp: {e}")
 
@@ -413,7 +428,7 @@ def valid_of_reg(reg):
     global table_of_reg
     try:
         reg = int(reg)
-        if reg >= 0 and reg < 8:
+        if reg >= 0 and reg < 11:
             return reg
         else:
             return -1
