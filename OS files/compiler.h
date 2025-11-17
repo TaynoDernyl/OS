@@ -15,6 +15,8 @@ const char* proga = NULL;
 
 int swag_size = 0;
 
+int code_compile_count = 0;
+
 uint8_t binary_output[65536];
 
 typedef struct type_reg
@@ -26,6 +28,36 @@ typedef struct type_reg
 
 type_reg registers[] = {
     {"al", 0, 8}, {"ah", 1, 8}, {"bl", 2, 8},  {"bh", 3, 8}, {"ax", 4, 16}, {"bx", 5, 16},  {"ds", 6, 16}, {"cs", 7, 16}, {"cx", 8, 16}, {"px", 9, 8}, {"py", 10, 8}, {NULL, 0, 0} 
+};
+
+typedef struct type_table_command {
+    char name[10];
+    uint8_t code;
+    void (*func)(void);   // имя функции как строка
+} type_table_command;
+
+type_table_command commands[] = {
+    {"NOP", 0x00, },         
+    {"load", 0x04, compile_load},
+    {"store", 0x05, compile_store},
+    {"sub", 0x07, compile_sub},
+    {"add", 0x08, compile_add},
+    {"inc", 0x09, compile_inc},
+    {"dec", 0x0A, compile_dec},
+    {"jmp", 0x0B, compile_jmp},
+    {"jz", 0x0C, compile_jz},
+    {"jnz", 0x0D, compile_jnz},
+    {"print", 0x0E, compile_print},
+    {"printstr", 0x10, compile_printstr},
+    {"input", 0xF9, compile_input},
+    {"stop", 0xFF, compile_stop},
+    {"setv", 0x30, compile_setv},
+    {"render", 0x31, compile_render},
+    {"init", 0x32, compile_init},
+    {"cmp", 0xD0, compile_cmp},
+    {"<", 0xD1, compile_lt},
+    {">", 0xD2, compile_gt},
+    {"", 0, ""}
 };
 
 typedef struct type_label
@@ -62,6 +94,11 @@ type_command commands_for_compile[400];
 //========================== ФУНКЦИИ КОМПИЛЯТОРА ================================
 
 //функции компилятора
+void add_command_for_compile(char* xD_comamd, int oper1, int oper2, int oper3);
+int find_code_command(char* command);
+char* find_function_name(uint8_t code);
+void compile_load(char* reg, int adres);
+void compile_store(int adres, char* reg);
 void compile_mov(char* dest, char* src);
 void compile_add(char* dest, char* src);
 void compile_sub(char* dest, char* src);
@@ -71,6 +108,8 @@ void compile_jmp(char* label);
 void compile_jz(char* label);
 void compile_jnz(char* label);
 void compile_cmp(char* op1, char* op2);
+void compile_lt(uint8_t reg1, uint8_t reg2);
+void compile_gt(uint8_t reg1, uint8_t reg2);
 void compile_print(void);
 void compile_input(void);
 void compile_stop(void);
