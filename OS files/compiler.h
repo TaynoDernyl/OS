@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h> 
+#define MAX_REG 10
 //================АРХИТЕКТУРА КОМПИЛЯТОРА==================
 bool trace = false;
 
@@ -9,6 +10,8 @@ int labels_count = 0;
 int data_adress_count = 0;
 
 int code_adress_count = 0;
+
+const char* proga = NULL;
 
 int swag_size = 0;
 
@@ -55,7 +58,7 @@ typedef struct type_command
     void (*function)(void);
 }type_command;
 
-type_command commands_for_compile[250];
+type_command commands_for_compile[400];
 //========================== ФУНКЦИИ КОМПИЛЯТОРА ================================
 
 //функции компилятора
@@ -80,6 +83,7 @@ void compile_printstr(void);
 bool valid_reg(char* reg);
 bool valid_label(char* label);
 bool valid_var(char* variable);
+int string_to_int(const char* str);
 
 //функции для записи - чтения
 void read_swag(char* path);
