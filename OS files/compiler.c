@@ -1,3 +1,16 @@
+/*# Copyright 2025 SWAGNER
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.*/
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -27,6 +40,26 @@ bool valid_label(char* label) {
 bool valid_var(char* variable) {
     // Базовая проверка
     return variable != NULL && strlen(variable) > 0;
+}
+
+char* find_function_name(uint8_t code){
+    for(int i = 0; i < sizeof(commands); i++){
+        if (commands[i].code == code){
+            if (trace) printf("[TRACE] Name function is: %s", commands[i].function);
+            return commands[i].function;
+        }
+    }
+    error("Function not found");
+}
+
+int find_code_command(char* command){
+    for(int i = 0; i < (sizeof(commands))/(sizeof(commands[0])); i++){
+        if ((strcmp(command, commands[i].name) == 0)){
+            if (trace) printf("[TRACE] Command found! %d", commands[i].code);
+            return commands[i].code;
+        }
+    }
+    error("Command not found");
 }
 
 void add_label(char* name, uint16_t address) {
@@ -87,7 +120,36 @@ uint8_t get_reg_code(char* reg_name) {
     return 0xFF; // invalid
 }
 
-// ==================== РЕАЛИЗАЦИЯ КОМАНД ДЛЯ ВАШЕГО ПРОЦЕССОРА ====================
+// ==================== РЕАЛИЗАЦИЯ КОМАНД ДЛЯ НАШЕГО ПРОЦЕССОРА ====================
+
+void add_command_for_compile(char* xD_comamd, int oper1, int oper2, int oper3){//добавляем комманды для компиляции
+    if (trace) printf("[TRACE] Add commands for compile: [%s %d %d %d]", xD_comamd, oper1, oper2, oper3);
+    if (*xD_comamd == '\0' || xD_comamd == NULL) error("Command is NULL");
+    if (oper1 == '\0') if (trace) printf("[TRACE] System command: %s", xD_comamd);
+    if (oper2 == '\0'){ 
+        code_adress_count += 2;
+        if(trace) printf("[TRACE] The command has been uploaded: %s - %d", xD_comamd, oper1);
+        strcpy(commands_for_compile[code_compile_count].name, xD_comamd);
+        commands_for_compile[code_compile_count].code = find_code_command(xD_comamd);
+        commands_for_compile[code_compile_count].function = (find_function_name(find_code_command(xD_comamd)));
+        commands_for_compile[code_compile_count].oper1 = (uint8_t)oper1;
+        code_compile_count++;
+        return;
+    }
+    else if (oper3 == '\0')
+    {
+        code_adress_count += 3;
+        if(trace) printf("[TRACE] The command has been uploaded: %s - %d, %d", xD_comamd, oper1, oper2);
+        strcpy(commands_for_compile[code_compile_count].name, *xD_comamd);
+        code_adress_count++;
+        strcpy(commands_for_compile[code_compile_count].oper1, oper1);
+        code_adress_count++;
+        strcpy(commands_for_compile[code_compile_count].oper2, oper2);
+        code_adress_count++;
+        return;
+    }
+    
+}
 
 void compile_mov(char* dest, char* src) {
     if(trace) printf("MOV %s, %s\n", dest, src);
@@ -391,7 +453,7 @@ int main(int argc, char **argv) {
 
         printf("> ");
         
-        // Читаем всю строку
+        // читаем всю строку
         if (fgets(line, sizeof(line), stdin)) {
             // Парсим строку
             int args_read = sscanf(line, "%99s %99s %99s %99s", xD_command, oper1, oper2, oper3);
@@ -402,8 +464,8 @@ int main(int argc, char **argv) {
                     xD_command, oper1, oper2, oper3);
             }
             
-            // Проверяем на NULL (пустые строки)
-            if (args_read < 4) oper3[0] = '\0'; // Обнуляем если не ввели
+            // проверяем на NULL (пустые строки)
+            if (args_read < 4) oper3[0] = '\0'; // обнуляем если не ввели
             if (args_read < 3) oper2[0] = '\0';
             if (args_read < 2) oper1[0] = '\0';
             if (args_read < 1) xD_command[0] = '\0';
@@ -414,7 +476,7 @@ int main(int argc, char **argv) {
             break;
         }
         
-        if(strcmp(oper1, "=") == 0)
+        if(strcmp(oper1, "=") == 0) //если создаем переменную
         {
             if(trace) printf("[TRACE] Processing assignment operation\n");
             
@@ -458,8 +520,15 @@ int main(int argc, char **argv) {
                 }
             }
             else
-            {
-                if(trace) printf("[TRACE] Source variable '%s' not found\n", oper2);
+            {   
+                if ((*xD_command >=0 || *xD_command <= 9) != true){ //создаем переменную
+                    if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", value is: \"%d\"\n", xD_command, oper2);
+                    
+                }
+                else{ //если переменная начинается с цифры
+                    error("The name of the variable begins with a number");
+                }
+
             }
         }
         
