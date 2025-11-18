@@ -30,35 +30,11 @@ type_reg registers[] = {
     {"al", 0, 8}, {"ah", 1, 8}, {"bl", 2, 8},  {"bh", 3, 8}, {"ax", 4, 16}, {"bx", 5, 16},  {"ds", 6, 16}, {"cs", 7, 16}, {"cx", 8, 16}, {"px", 9, 8}, {"py", 10, 8}, {NULL, 0, 0} 
 };
 
-typedef struct type_table_command {
-    char name[10];
-    uint8_t code;
-    void (*func)(void);   // имя функции как строка
-} type_table_command;
-
-type_table_command commands[] = {
-    {"NOP", 0x00, },         
-    {"load", 0x04, compile_load},
-    {"store", 0x05, compile_store},
-    {"sub", 0x07, compile_sub},
-    {"add", 0x08, compile_add},
-    {"inc", 0x09, compile_inc},
-    {"dec", 0x0A, compile_dec},
-    {"jmp", 0x0B, compile_jmp},
-    {"jz", 0x0C, compile_jz},
-    {"jnz", 0x0D, compile_jnz},
-    {"print", 0x0E, compile_print},
-    {"printstr", 0x10, compile_printstr},
-    {"input", 0xF9, compile_input},
-    {"stop", 0xFF, compile_stop},
-    {"setv", 0x30, compile_setv},
-    {"render", 0x31, compile_render},
-    {"init", 0x32, compile_init},
-    {"cmp", 0xD0, compile_cmp},
-    {"<", 0xD1, compile_lt},
-    {">", 0xD2, compile_gt},
-    {"", 0, ""}
-};
+// объявляем типы функций
+typedef void (*func_no_args)(void);
+typedef void (*func_one_arg)(char*);
+typedef void (*func_two_args)(char*, char*);
+typedef void (*func_three_args)(char*, char*, char*);
 
 typedef struct type_label
 {
@@ -87,6 +63,7 @@ typedef struct type_command
     uint8_t oper1;
     uint8_t oper2;
     uint8_t oper3;
+    uint8_t cell;
     void (*function)(void);
 }type_command;
 
@@ -108,8 +85,8 @@ void compile_jmp(char* label);
 void compile_jz(char* label);
 void compile_jnz(char* label);
 void compile_cmp(char* op1, char* op2);
-void compile_lt(uint8_t reg1, uint8_t reg2);
-void compile_gt(uint8_t reg1, uint8_t reg2);
+void compile_lt(char* reg1, char* reg2);
+void compile_gt(char* reg1, char* reg2);
 void compile_print(void);
 void compile_input(void);
 void compile_stop(void);
@@ -117,6 +94,38 @@ void compile_setv(char* x, char* y, char* color);
 void compile_render(void);
 void compile_init(void);
 void compile_printstr(void);
+
+// обновленная структура с информацией о аргументах
+typedef struct type_table_command {
+    char name[10];
+    uint8_t code;
+    uint8_t args_count;  // количество аргументов
+    void (*function)(void);   // универсальный указатель
+} type_table_command;
+
+type_table_command commands[] = {
+    {"nop", 0x00, 0, NULL},         
+    {"load", 0x04, 2, (void(*)(void))compile_load},
+    {"store", 0x05, 2, (void(*)(void))compile_store},
+    {"sub", 0x07, 2, (void(*)(void))compile_sub},
+    {"add", 0x08, 2, (void(*)(void))compile_add},
+    {"inc", 0x09, 1, (void(*)(void))compile_inc},
+    {"dec", 0x0a, 1, (void(*)(void))compile_dec},
+    {"jmp", 0x0b, 1, (void(*)(void))compile_jmp},
+    {"jz", 0x0c, 1, (void(*)(void))compile_jz},
+    {"jnz", 0x0d, 1, (void(*)(void))compile_jnz},
+    {"print", 0x0e, 0, (void(*)(void))compile_print},
+    {"printstr", 0x10, 0, (void(*)(void))compile_printstr},
+    {"input", 0xf9, 0, (void(*)(void))compile_input},
+    {"stop", 0xff, 0, (void(*)(void))compile_stop},
+    {"setv", 0x30, 3, (void(*)(void))compile_setv},
+    {"render", 0x31, 0, (void(*)(void))compile_render},
+    {"init", 0x32, 0, (void(*)(void))compile_init},
+    {"cmp", 0xd0, 2, (void(*)(void))compile_cmp},
+    {"<", 0xd1, 2, (void(*)(void))compile_lt},
+    {">", 0xd2, 2, (void(*)(void))compile_gt},
+    {"", 0, 0, NULL}
+};
 
 //функции валидности
 bool valid_reg(char* reg);
