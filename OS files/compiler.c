@@ -15,7 +15,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include "compiler.h" 
+#include <string.h>
 
+#define NO_OPERAND -1
 // ==================== РЕАЛИЗАЦИЯ БАЗОВЫХ ФУНКЦИЙ ====================
 
 void error(char* user_input) {
@@ -42,20 +44,10 @@ bool valid_var(char* variable) {
     return variable != NULL && strlen(variable) > 0;
 }
 
-char* find_function_name(uint8_t code){
-    for(int i = 0; i < sizeof(commands); i++){
-        if (commands[i].code == code){
-            if (trace) printf("[TRACE] Name function is: %s", commands[i].function);
-            return commands[i].function;
-        }
-    }
-    error("Function not found");
-}
-
 int find_code_command(char* command){
     for(int i = 0; i < (sizeof(commands))/(sizeof(commands[0])); i++){
         if ((strcmp(command, commands[i].name) == 0)){
-            if (trace) printf("[TRACE] Command found! %d", commands[i].code);
+            if (trace) printf("[TRACE] Command found! %02X\n", commands[i].code);
             return commands[i].code;
         }
     }
@@ -122,33 +114,102 @@ uint8_t get_reg_code(char* reg_name) {
 
 // ==================== РЕАЛИЗАЦИЯ КОМАНД ДЛЯ НАШЕГО ПРОЦЕССОРА ====================
 
-void add_command_for_compile(char* xD_comamd, int oper1, int oper2, int oper3){//добавляем комманды для компиляции
-    if (trace) printf("[TRACE] Add commands for compile: [%s %d %d %d]", xD_comamd, oper1, oper2, oper3);
-    if (*xD_comamd == '\0' || xD_comamd == NULL) error("Command is NULL");
-    if (oper1 == '\0') if (trace) printf("[TRACE] System command: %s", xD_comamd);
-    if (oper2 == '\0'){ 
-        code_adress_count += 2;
-        if(trace) printf("[TRACE] The command has been uploaded: %s - %d", xD_comamd, oper1);
-        strcpy(commands_for_compile[code_compile_count].name, xD_comamd);
-        commands_for_compile[code_compile_count].code = find_code_command(xD_comamd);
-        commands_for_compile[code_compile_count].function = (find_function_name(find_code_command(xD_comamd)));
-        commands_for_compile[code_compile_count].oper1 = (uint8_t)oper1;
-        code_compile_count++;
-        return;
-    }
-    else if (oper3 == '\0')
-    {
-        code_adress_count += 3;
-        if(trace) printf("[TRACE] The command has been uploaded: %s - %d, %d", xD_comamd, oper1, oper2);
-        strcpy(commands_for_compile[code_compile_count].name, *xD_comamd);
-        code_adress_count++;
-        strcpy(commands_for_compile[code_compile_count].oper1, oper1);
-        code_adress_count++;
-        strcpy(commands_for_compile[code_compile_count].oper2, oper2);
-        code_adress_count++;
-        return;
-    }
+void add_command_for_compile(char* xD_command, int oper1, int oper2, int oper3) {
+    if (trace) printf("[TRACE] Add commands for compile: [%s %d %d %d]\n", xD_command, oper1, oper2, oper3);
     
+    if (xD_command == NULL || *xD_command == '\0') error("Command is NULL");
+    
+    uint8_t command_code = find_code_command(xD_command);
+    
+    // проверяем на специальное значение NO_OPERAND
+    if (oper1 == NO_OPERAND && oper2 == NO_OPERAND && oper3 == NO_OPERAND) {
+        // команда без операндов
+        if(trace) printf("[TRACE] The command has been uploaded: %s (no operands)\n", xD_command);
+        strcpy(commands_for_compile[code_compile_count].name, xD_command);
+        commands_for_compile[code_compile_count].code = command_code;
+        commands_for_compile[code_compile_count].oper1 = 0;
+        commands_for_compile[code_compile_count].oper2 = 0;
+        commands_for_compile[code_compile_count].oper3 = 0;
+        commands_for_compile[code_compile_count].cell = 0;
+        code_compile_count++;
+    }
+    else if (oper2 == NO_OPERAND && oper3 == NO_OPERAND) {
+        // команда с 1 операндом
+        if(trace) printf("[TRACE] The command has been uploaded: %s - %d\n", xD_command, oper1);
+        strcpy(commands_for_compile[code_compile_count].name, xD_command);
+        commands_for_compile[code_compile_count].code = command_code;
+        commands_for_compile[code_compile_count].oper1 = (uint8_t)oper1;
+        commands_for_compile[code_compile_count].oper2 = 0;
+        commands_for_compile[code_compile_count].oper3 = 0;
+        commands_for_compile[code_compile_count].cell = 1;
+        code_compile_count++;
+    }
+    else if (oper3 == NO_OPERAND) {
+        // команда с 2 операндами
+        if(trace) printf("[TRACE] The command has been uploaded: %s - %d, %d\n", xD_command, oper1, oper2);
+        strcpy(commands_for_compile[code_compile_count].name, xD_command);
+        commands_for_compile[code_compile_count].code = command_code;
+        commands_for_compile[code_compile_count].oper1 = (uint8_t)oper1;
+        commands_for_compile[code_compile_count].oper2 = (uint8_t)oper2;
+        commands_for_compile[code_compile_count].oper3 = 0;
+        commands_for_compile[code_compile_count].cell = 2;
+        code_compile_count++;
+    }
+    else {
+        // команда с 3 операндами
+        if(trace) printf("[TRACE] The command has been uploaded: %s - %d, %d, %d\n", xD_command, oper1, oper2, oper3);
+        strcpy(commands_for_compile[code_compile_count].name, xD_command);
+        commands_for_compile[code_compile_count].code = command_code;
+        commands_for_compile[code_compile_count].oper1 = (uint8_t)oper1;
+        commands_for_compile[code_compile_count].oper2 = (uint8_t)oper2;
+        commands_for_compile[code_compile_count].oper3 = (uint8_t)oper3;
+        commands_for_compile[code_compile_count].cell = 3;
+        code_compile_count++;
+    }
+}
+
+void compile_load(char* reg, int address) {
+    if(trace) printf("compile_load: %s, %d\n", reg, address);
+    
+    uint8_t reg_code = get_reg_code(reg);
+    
+    binary_output[code_adress_count++] = 0x04; // load opcode
+    binary_output[code_adress_count++] = reg_code;
+    binary_output[code_adress_count++] = address & 0xff;
+    binary_output[code_adress_count++] = (address >> 8) & 0xff;
+}
+
+void compile_store(int address, char* reg) {
+    if(trace) printf("compile_store: %d, %s\n", address, reg);
+    
+    uint8_t reg_code = get_reg_code(reg);
+    
+    binary_output[code_adress_count++] = 0x05; // store opcode
+    binary_output[code_adress_count++] = reg_code;
+    binary_output[code_adress_count++] = address & 0xff;
+    binary_output[code_adress_count++] = (address >> 8) & 0xff;
+}
+
+void compile_lt(char* reg1, char* reg2) {
+    if(trace) printf("compile_lt: %s, %s\n", reg1, reg2);
+    
+    uint8_t reg1_code = get_reg_code(reg1);
+    uint8_t reg2_code = get_reg_code(reg2);
+    
+    binary_output[code_adress_count++] = 0xd1; // < opcode
+    binary_output[code_adress_count++] = reg1_code;
+    binary_output[code_adress_count++] = reg2_code;
+}
+
+void compile_gt(char* reg1, char* reg2) {
+    if(trace) printf("compile_gt: %s, %s\n", reg1, reg2);
+    
+    uint8_t reg1_code = get_reg_code(reg1);
+    uint8_t reg2_code = get_reg_code(reg2);
+    
+    binary_output[code_adress_count++] = 0xd2; // > opcode
+    binary_output[code_adress_count++] = reg1_code;
+    binary_output[code_adress_count++] = reg2_code;
 }
 
 void compile_mov(char* dest, char* src) {
@@ -327,28 +388,49 @@ void parse_line(char* line) {
 
 void first_pass(void) {
     if(trace) printf("=== FIRST PASS ===\n");
+    add_command_for_compile("input", -1, -1, -1);
 }
 
 void second_pass(void) {
     if(trace) printf("=== SECOND PASS ===\n");
-    // Заглушка - генерируем тестовый код
-    compile_init();
-    compile_mov("al", "10");
-    compile_mov("ah", "0");
-    compile_add("ax", "bx");
-    compile_inc("cx");
-    compile_setv("px", "py", "al");
-    compile_render();
-    compile_jmp("loop");
-    compile_stop();
+    
+    // Используйте code_compile_count вместо sizeof
+    for(int i = 0; i < code_compile_count; i++){
+        if (trace) printf("[TRACE] %d - number of command\n", i);
+        
+        char* name = commands_for_compile[i].name;
+        if (trace) printf("[TRACE] Now command is: %s\n", name);
+        
+        // Проверка на пустую команду
+        if(name == NULL || strlen(name) == 0) {
+            if(trace) printf("[TRACE] Skipping empty command\n");
+            continue;
+        }
+        
+        for(int j = 0; j < (sizeof(commands))/(sizeof(commands[0])); j++){
+            if (strcmp(commands[j].name, name) == 0){
+                if (trace) printf("[TRACE] Found name: %s\n", commands[j].name);
+                if(commands[j].function != NULL) {
+                    commands[j].function();
+                } else {
+                    if(trace) printf("[TRACE] Function pointer is NULL\n");
+                }
+                break;
+            }
+        }
+    }
 }
-
 void reset_compiler(void) {
     labels_count = 0;
     data_adress_count = 0;
     code_adress_count = 0;
     memset(binary_output, 0, sizeof(binary_output));
     if(trace) printf("Compiler reset\n");
+}
+
+void compile(void){
+    first_pass();
+    second_pass();
 }
 
 uint16_t parse_number(char* str) {
@@ -403,13 +485,15 @@ int string_to_int(const char *str) {
 }
 
 void print_binary_info(void) {
-    if(trace){printf("\n=== BINARY OUTPUT ===\n");
-    printf("Code size: %d bytes\n", code_adress_count);
-    printf("First 16 bytes dump:\n");
-    for(int i = 0; i < code_adress_count && i < 16; i++) {
-        printf("%02X ", binary_output[i]);
+    if(trace){
+        printf("\n=== BINARY OUTPUT ===\n");
+        printf("Code size: %d bytes\n", code_adress_count);
+        printf("First 16 bytes dump:\n");
+        for(int i = 0; i < code_adress_count && i < 16; i++) {
+            printf("%02X ", binary_output[i]);
+        }
+        printf("\n");
     }
-    printf("\n");}
 }
 
 void read_swag(char* path) {
@@ -426,6 +510,12 @@ void compile_commands(void) {
     second_pass();
 }
 
+// ==================== TEST ====================
+
+void test(){
+    
+}
+
 // ==================== MAIN ====================
 
 int main(int argc, char **argv) {
@@ -439,11 +529,14 @@ int main(int argc, char **argv) {
     }
 
     if(trace){
-        printf("=== LETOS COMPILER v0.6 ===\n");
+        printf("=== LETOS COMPILER v0.0.6 ===\n");
         printf("Trace mode: ON\n");
     }
     
-    while (true)
+    compile();
+    print_binary_info();
+
+    /*while (true)
     {
         char line[256] = {0};
         char xD_command[100] = {0};
@@ -534,7 +627,7 @@ int main(int argc, char **argv) {
         
         if(trace) printf("[TRACE] Data address count: %d, Labels count: %d\n", 
                data_adress_count, labels_count);
-    }
+    }*/
     
     if(trace) printf("=== Compilation finished ===\n");
     return 0;
