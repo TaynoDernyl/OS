@@ -20,6 +20,11 @@
 #define NO_OPERAND -1
 // ==================== РЕАЛИЗАЦИЯ БАЗОВЫХ ФУНКЦИЙ ====================
 
+bool word_or_byte(uint16_t number){
+    if ((number >> 8) == 0) return 0;
+    else return 1;
+}
+
 void error(char* user_input) {
     printf("Compilation error: %s\n", user_input);
     exit(1);
@@ -536,21 +541,28 @@ int main(int argc, char **argv) {
     compile();
     print_binary_info();
 
-    /*while (true)
+    while (true)
     {
         char line[256] = {0};
         char xD_command[100] = {0};
-        char oper1[100] = {0};
-        char oper2[100] = {0};
-        char oper3[100] = {0};
+        char oper1[100] = {NO_OPERAND};
+        char oper2[100] = {NO_OPERAND};
+        char oper3[100] = {NO_OPERAND};
 
         printf("> ");
         
         // читаем всю строку
         if (fgets(line, sizeof(line), stdin)) {
-            // Парсим строку
+            // парсим строку
             int args_read = sscanf(line, "%99s %99s %99s %99s", xD_command, oper1, oper2, oper3);
-            
+            if (((oper1[0] >= '0' || oper1[0] <= '9') || (oper2[0] >= '0' || oper2[0] <= '9') || (oper3[0] >= '0' || oper3[0] <= '9')) != 1){
+                for(int i = 0; i < ((sizeof(variables))/(sizeof(variables[0]))); i++){
+                    char* name = variables[i].name;
+                    if (strcmp(name, oper1) == 1) memset(oper1, 0, sizeof(oper1));oper1[0] = variables[i].value.word; printf("[TRACE] Oper1 var is: %d", oper1[0]);
+                    if (strcmp(name, oper2) == 1) memset(oper2, 0, sizeof(oper2));oper2[0] = variables[i].value.word; printf("[TRACE] Oper2 var is: %d", oper1[0]);
+                    if (strcmp(name, oper3) == 1) memset(oper3, 0, sizeof(oper3));oper3[0] = variables[i].value.word; printf("[TRACE] Oper3 var is: %d", oper1[0]);
+                }
+            }
             if(trace) {
                 printf("[TRACE] Args read: %d\n", args_read);
                 printf("[TRACE] Command: '%s', Oper1: '%s', Oper2: '%s', Oper3: '%s'\n", 
@@ -558,10 +570,10 @@ int main(int argc, char **argv) {
             }
             
             // проверяем на NULL (пустые строки)
-            if (args_read < 4) oper3[0] = '\0'; // обнуляем если не ввели
-            if (args_read < 3) oper2[0] = '\0';
-            if (args_read < 2) oper1[0] = '\0';
-            if (args_read < 1) xD_command[0] = '\0';
+            if (args_read < 4) oper3[0] = NO_OPERAND; // обнуляем если не ввели
+            if (args_read < 3) oper2[0] = NO_OPERAND;
+            if (args_read < 2) oper1[0] = NO_OPERAND;
+            if (args_read < 1) xD_command[0] = NO_OPERAND;
         }
         
         if(strcmp(xD_command, "exit") == 0){
@@ -573,7 +585,7 @@ int main(int argc, char **argv) {
         {
             if(trace) printf("[TRACE] Processing assignment operation\n");
             
-            if (find_variable(oper2) == 0)
+            if (find_variable(oper2) != -1)
             {
                 if(trace) printf("[TRACE] Source variable '%s' found\n", oper2);
                 
@@ -614,8 +626,23 @@ int main(int argc, char **argv) {
             }
             else
             {   
-                if ((*xD_command >=0 || *xD_command <= 9) != true){ //создаем переменную
-                    if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", value is: \"%d\"\n", xD_command, oper2);
+                if ((*xD_command >= '0' && *xD_command <= '9') != true){ //создаем переменную
+                    if (oper2[0] >= '@' && (oper2[0] <= '/' || oper2[0] >= ' ')){
+                        int count = 0;
+                        for(int i = 0; ; i++){
+                            if (oper2[i] == 0){data_adress_count += 2;count += 2; break;}
+                            data_adress_count++;
+                            count++;
+                        }
+                        add_variable(xD_command, data_adress_count-count, "str", oper2[0]);
+                        if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", string is: \"%s\", adres: %d\n", xD_command, oper2, data_adress_count - count);
+                    }
+                    else{
+                        int value = string_to_int(oper2);
+                        if (value > 255) add_variable(xD_command, data_adress_count++, "word", value);
+                        else add_variable(xD_command, data_adress_count++, "byte", value);
+                        if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", value is: \"%d\", adres: %d\n", xD_command, value, data_adress_count-=1);
+                    }
                     
                 }
                 else{ //если переменная начинается с цифры
@@ -624,10 +651,14 @@ int main(int argc, char **argv) {
 
             }
         }
+
+        else{
+            add_command_for_compile(xD_command, oper1[0], oper2[0], oper3[0]);
+        }
         
         if(trace) printf("[TRACE] Data address count: %d, Labels count: %d\n", 
                data_adress_count, labels_count);
-    }*/
+    }
     
     if(trace) printf("=== Compilation finished ===\n");
     return 0;
