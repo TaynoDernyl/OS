@@ -83,7 +83,7 @@ void add_variable(char* name, uint16_t address, char* type, uint16_t value) {
         }
         
         data_adress_count++;
-        if(trace) printf("Added variable: %s of type %s\n", name, type);
+        if(trace) printf("[TRACE] Added variable: %s of type %s\n", name, type);
     } else {
         error("Too many variables");
     }
@@ -537,9 +537,6 @@ int main(int argc, char **argv) {
         printf("=== LETOS COMPILER v0.0.6 ===\n");
         printf("Trace mode: ON\n");
     }
-    
-    compile();
-    print_binary_info();
 
     while (true)
     {
@@ -630,20 +627,20 @@ int main(int argc, char **argv) {
                     if (oper2[0] >= '@' && (oper2[0] <= '/' || oper2[0] >= ' ')){
                         int count = 0;
                         for(int i = 0; ; i++){
-                            if (oper2[i] == 0){data_adress_count += 2;count += 2; break;}
+                            if (oper2[i] == 0){break;}
                             data_adress_count++;
                             count++;
                         }
-                        add_variable(xD_command, data_adress_count-count, "str", oper2[0]);
-                        if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", string is: \"%s\", adres: %d\n", xD_command, oper2, data_adress_count - count);
+                        add_variable(xD_command, (data_adress_count-count), "str", oper2[0]);
+                        if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", string is: \"%s\", adres: %d\n", xD_command, oper2, data_adress_count - count - 1);
                     }
                     else{
                         int value = string_to_int(oper2);
-                        if (value > 255) add_variable(xD_command, data_adress_count++, "word", value);
-                        else add_variable(xD_command, data_adress_count++, "byte", value);
-                        if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", value is: \"%d\", adres: %d\n", xD_command, value, data_adress_count-=1);
+                        if (value > 255) {add_variable(xD_command, data_adress_count, "word", value); data_adress_count++;}
+                        else {add_variable(xD_command, data_adress_count, "byte", value);}
+                        if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", value is: \"%d\", adres: %d\n", xD_command, value, data_adress_count - 1);
                     }
-                    
+                    print_symbol_table();
                 }
                 else{ //если переменная начинается с цифры
                     error("The name of the variable begins with a number");
