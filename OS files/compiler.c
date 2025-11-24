@@ -26,7 +26,7 @@ bool word_or_byte(uint16_t number){
 }
 
 void error(char* user_input) {
-    printf("Compilation error: %s\n", user_input);
+    printf("[ERROR]: %s\n", user_input);
     exit(1);
 }
 
@@ -71,18 +71,21 @@ void add_label(char* name, uint16_t address) {
 }
 
 void add_variable(char* name, uint16_t address, char* type, uint16_t value) {
-    if(data_adress_count < 250) {
-        strncpy(variables[data_adress_count].name, name, 31);
-        strncpy(variables[data_adress_count].type, type, 9);
-        variables[data_adress_count].adres = address;
+    if(var_count < 250) {
+        strncpy(variables[var_count].name, name, 32);
+        strncpy(variables[var_count].type, type, 10);
+        variables[var_count].adres = address;
         
         if(strcmp(type, "byte") == 0) {
-            variables[data_adress_count].value.byte = (uint8_t)value;
-        } else {
-            variables[data_adress_count].value.word = value;
-        }
+            variables[var_count].value.byte = (uint8_t)value;
+        } else if(strcmp(type, "word") == 0){
+            variables[var_count].value.word = value;
+        } else if(strcmp(type, "str") == 0){
+            variables[var_count].value.byte = value;
+        } 
         
         data_adress_count++;
+        var_count++;
         if(trace) printf("[TRACE] Added variable: %s of type %s\n", name, type);
     } else {
         error("Too many variables");
@@ -461,9 +464,16 @@ void print_symbol_table(void) {
         printf("  %s: 0x%04X\n", labels[i].name, labels[i].adres);
     }
     
-    printf("Variables (%d):\n", data_adress_count);
-    for(int i = 0; i < data_adress_count; i++) {
-        printf("  %s: 0x%04X (%s)\n", variables[i].name, variables[i].adres, variables[i].type);
+    printf("Variables (%d):\n", var_count);
+    for(int i = 0; i < var_count; i++) {
+        if (strcmp(variables[i].type, "str") == 0) {
+            char temp = (char)variables[i].value.byte;
+            printf("  %s: 0x%04X (%s) = %c \n", variables[i].name, variables[i].adres, variables[i].type, temp);
+        }
+        else {
+            if (strcmp(variables[i].type, "word") == 0) printf("  %s: 0x%04X (%s) = %04d\n", variables[i].name, variables[i].adres, variables[i].type, variables[i].value.word);
+            else printf("  %s: 0x%04X (%s) = %03d\n", variables[i].name, variables[i].adres, variables[i].type, variables[i].value.byte);
+        }
     }
 }
 
@@ -582,44 +592,63 @@ int main(int argc, char **argv) {
         {
             if(trace) printf("[TRACE] Processing assignment operation\n");
             
-            if (find_variable(oper2) != -1)
+            if (find_variable(oper2) != -1) //присваиваем переменную
             {
                 if(trace) printf("[TRACE] Source variable '%s' found\n", oper2);
                 
                 char name[25] = {0};
                 char type[10] = {0};
                 int number_of_var;
-                bool var_id;
-
+                char var_id[6];
                 strcpy(name, oper2);
-                for(int i = 0; i < sizeof(variables); i++){
-                    if (strcmp(name, variables[i].name) == 0){
-                        number_of_var = i;
-                        strcpy(type, variables[number_of_var].type);
-                        
-                        if(trace) printf("[TRACE] Found variable at index %d, type: %s\n", i, type);
-                        
-                        if ((variables[number_of_var].value.word >> 8) == 0){
-                            var_id = false;
-                            if(trace) printf("[TRACE] Value fits in byte: %u\n", variables[number_of_var].value.word);
+                for(int i = 0; i < sizeof(variables)/sizeof(variables[0]); i++){
+                    if(strcmp("byte", variables[i].type) == 0 || strcmp("word", variables[i].type) == 0){
+                        if (strcmp(name, variables[i].name) == 0){
+                            number_of_var = i;
+                            strcpy(type, variables[number_of_var].type);
+                            
+                            if(trace) printf("[TRACE] Found variable at index %d, type: %s\n", i, type);
+                            
+                            if ((variables[number_of_var].value.word >> 8) == 0){
+                                strcpy(var_id, "byte");
+                                if(trace) printf("[TRACE] Value fits in byte: %u\n", variables[number_of_var].value.word);
+                            }
+                            else{
+                                strcpy(var_id, "word");
+                                if(trace) printf("[TRACE] Value requires word: %u\n", variables[number_of_var].value.word);
+                            }
+                            break;
                         }
-                        else{
-                            var_id = true;
-                            if(trace) printf("[TRACE] Value requires word: %u\n", variables[number_of_var].value.word);
+                    }
+                    else if(strcmp("str", variables[i].type) == 0){
+                        if (strcmp(name, variables[i].name) == 0){
+                            number_of_var = i;
+                            strcpy(var_id, "str");
+                            if(trace) printf("[TRACE] Value is str: %u\n", variables[number_of_var].value.byte);
+                            break;
                         }
                     }
                 }
                 
-                if (var_id){
+                if (strcmp(var_id, "word") == 0){
                     add_variable(xD_command, data_adress_count++, type, variables[number_of_var].value.word);
                     if(trace) printf("[TRACE] Created word variable '%s' with value %u\n", 
                            xD_command, variables[number_of_var].value.word);
                 }
-                else{
+                else if(strcmp(var_id, "byte") == 0){
                     add_variable(xD_command, data_adress_count++, type, variables[number_of_var].value.byte);
                     if(trace) printf("[TRACE] Created byte variable '%s' with value %u\n", 
                            xD_command, variables[number_of_var].value.byte);
                 }
+                else if(strcmp(var_id, "str") == 0){
+                    add_variable(xD_command, variables[number_of_var].adres, "str", variables[number_of_var].value.byte);
+                    data_adress_count -= 1; //в добавление переменной есть ++, поэтому уменьшаем
+                    if(trace) printf("[TRACE] Created str variable '%s' with adres %u\n", 
+                           xD_command, variables[number_of_var].adres);
+                    print_symbol_table();       
+                }
+
+                else error("No type var");
             }
             else
             {   

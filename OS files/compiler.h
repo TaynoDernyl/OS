@@ -24,6 +24,8 @@ int data_adress_count = 0;
 
 int code_adress_count = 0;
 
+int var_count = 0;
+
 const char* proga = NULL;
 
 int swag_size = 0;
