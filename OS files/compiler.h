@@ -15,8 +15,13 @@
 #include <stdbool.h>
 #include <stdlib.h> 
 #define MAX_REG 10
+#define NO_OPERAND -1
 //================АРХИТЕКТУРА КОМПИЛЯТОРА==================
 bool trace = false;
+
+bool checking_the_numbers = 1;
+
+int count_checking_the_numbers = 0;
 
 int labels_count = 0;
 
@@ -62,6 +67,7 @@ type_label labels[100];
 typedef struct type_var {
     char name[32];
     uint16_t adres;
+    uint8_t count;
     char type[10];
     union {
         uint8_t byte;
@@ -75,9 +81,9 @@ typedef struct type_command
 {
     char name[10];
     uint8_t code;
-    uint8_t oper1;
-    uint8_t oper2;
-    uint8_t oper3;
+    char oper1[32];
+    char oper2[32];
+    char oper3[32];
     uint8_t cell;
     void (*function)(void);
 }type_command;
@@ -86,7 +92,7 @@ type_command commands_for_compile[400];
 //========================== ФУНКЦИИ КОМПИЛЯТОРА ================================
 
 //функции компилятора
-void add_command_for_compile(char* xD_comamd, int oper1, int oper2, int oper3);
+void add_command_for_compile(char* xD_comamd, char* oper1, char* oper2, char* oper3);
 int find_code_command(char* command);
 char* find_function_name(uint8_t code);
 void compile_load(char* reg, int adres);
@@ -126,11 +132,12 @@ type_table_command commands[] = {
     {"add", 0x08, 2, (void(*)(void))compile_add},
     {"inc", 0x09, 1, (void(*)(void))compile_inc},
     {"dec", 0x0a, 1, (void(*)(void))compile_dec},
-    {"jmp", 0x0b, 1, (void(*)(void))compile_jmp},
-    {"jz", 0x0c, 1, (void(*)(void))compile_jz},
-    {"jnz", 0x0d, 1, (void(*)(void))compile_jnz},
+    {"jmp", 0x0b, 2, (void(*)(void))compile_jmp},
+    {"jz", 0x0c, 2, (void(*)(void))compile_jz},
+    {"jnz", 0x0d, 2, (void(*)(void))compile_jnz},
     {"print", 0x0e, 0, (void(*)(void))compile_print},
     {"printstr", 0x10, 0, (void(*)(void))compile_printstr},
+    {"printstr", 0x20, 2, (void(*)(void))compile_mov},
     {"input", 0xf9, 0, (void(*)(void))compile_input},
     {"stop", 0xff, 0, (void(*)(void))compile_stop},
     {"setv", 0x30, 3, (void(*)(void))compile_setv},
@@ -163,6 +170,8 @@ void compile_commands(void);
 // работа с символами
 void add_label(char* name, uint16_t address);
 void add_variable(char* name, uint16_t address, char* type, uint16_t value);
+int delete_variable(char* name);
+int delete_label(char* name);
 int find_label(char* name);
 int find_variable(char* name);
 
