@@ -17,7 +17,7 @@
 #include "compiler.h" 
 #include <string.h>
 
-#define NO_OPERAND -1
+
 // ==================== РЕАЛИЗАЦИЯ БАЗОВЫХ ФУНКЦИЙ ====================
 
 bool word_or_byte(uint16_t number){
@@ -92,9 +92,28 @@ void add_variable(char* name, uint16_t address, char* type, uint16_t value) {
     }
 }
 
+int delete_variable(char* name){
+    short index = find_variable(name);
+    if (index >= 0){
+    variables[index].adres = -1;
+    variables[index].count = -1;
+    memset(variables[index].name, 0, sizeof(variables[index].name));
+    memset(variables[index].type, 0, sizeof(variables[index].type));
+    variables[index].value.word = -1;
+    if (trace) printf("[TRACE] Var has deleted: Adres = %d, count = %d, name = %s, type = %s, value = %04d", variables[index].adres, variables[index].count, variables[index].name, variables[index].type, variables[index].value.word);
+    data_adress_count -= 1;
+    var_count -= 1;
+    return index;
+    }
+    else{
+        printf("[TRACE] Var is not found");
+        return -1;
+    }
+}
+
 int find_label(char* name) {
     for(int i = 0; i < labels_count; i++) {
-        if(strcmp(labels[i].name, name) == 0) {
+        if(strcmp(variables[i].name, name) == 0) {
             return i;
         }
     }
@@ -102,11 +121,15 @@ int find_label(char* name) {
 }
 
 int find_variable(char* name) {
-    for(int i = 0; i < data_adress_count; i++) {
+    if (trace) printf("[TRACE] Finding a \'%s\' in: %d\n", name, var_count);
+    for(int i = 0; i < var_count; i++) {
+        if (trace) printf("[TRACE] Now name is: %s, index = %d\n", variables[i].name, i);
         if(strcmp(variables[i].name, name) == 0) {
+            if (trace) printf("[TRACE] Var found at index = %d (name:%s)!\n", i, variables[i].name);
             return i;
         }
     }
+    if (trace) printf("[TRACE] Var not found\n");
     return -1;
 }
 
@@ -122,7 +145,7 @@ uint8_t get_reg_code(char* reg_name) {
 
 // ==================== РЕАЛИЗАЦИЯ КОМАНД ДЛЯ НАШЕГО ПРОЦЕССОРА ====================
 
-void add_command_for_compile(char* xD_command, int oper1, int oper2, int oper3) {
+void add_command_for_compile(char* xD_command, char* oper1, char* oper2, char* oper3) {
     if (trace) printf("[TRACE] Add commands for compile: [%s %d %d %d]\n", xD_command, oper1, oper2, oper3);
     
     if (xD_command == NULL || *xD_command == '\0') error("Command is NULL");
@@ -130,47 +153,47 @@ void add_command_for_compile(char* xD_command, int oper1, int oper2, int oper3) 
     uint8_t command_code = find_code_command(xD_command);
     
     // проверяем на специальное значение NO_OPERAND
-    if (oper1 == NO_OPERAND && oper2 == NO_OPERAND && oper3 == NO_OPERAND) {
+    if (oper1[0] == NO_OPERAND && oper2[0] == NO_OPERAND && oper3[0] == NO_OPERAND) {
         // команда без операндов
         if(trace) printf("[TRACE] The command has been uploaded: %s (no operands)\n", xD_command);
         strcpy(commands_for_compile[code_compile_count].name, xD_command);
         commands_for_compile[code_compile_count].code = command_code;
-        commands_for_compile[code_compile_count].oper1 = 0;
-        commands_for_compile[code_compile_count].oper2 = 0;
-        commands_for_compile[code_compile_count].oper3 = 0;
+        commands_for_compile[code_compile_count].oper1[0] = '\0';
+        commands_for_compile[code_compile_count].oper2[0] = '\0';
+        commands_for_compile[code_compile_count].oper3[0] = '\0';
         commands_for_compile[code_compile_count].cell = 0;
         code_compile_count++;
     }
-    else if (oper2 == NO_OPERAND && oper3 == NO_OPERAND) {
+    else if (oper2[0] == NO_OPERAND && oper3[0] == NO_OPERAND) {
         // команда с 1 операндом
-        if(trace) printf("[TRACE] The command has been uploaded: %s - %d\n", xD_command, oper1);
+        if(trace) printf("[TRACE] The command has been uploaded: %s - %s\n", xD_command, oper1);
         strcpy(commands_for_compile[code_compile_count].name, xD_command);
         commands_for_compile[code_compile_count].code = command_code;
-        commands_for_compile[code_compile_count].oper1 = (uint8_t)oper1;
-        commands_for_compile[code_compile_count].oper2 = 0;
-        commands_for_compile[code_compile_count].oper3 = 0;
+        strcpy(commands_for_compile[code_compile_count].oper1, oper1);
+        commands_for_compile[code_compile_count].oper2[0] = '\0';
+        commands_for_compile[code_compile_count].oper3[0] = '\0';
         commands_for_compile[code_compile_count].cell = 1;
         code_compile_count++;
     }
-    else if (oper3 == NO_OPERAND) {
+    else if (oper3[0] == NO_OPERAND) {
         // команда с 2 операндами
-        if(trace) printf("[TRACE] The command has been uploaded: %s - %d, %d\n", xD_command, oper1, oper2);
+        if(trace) printf("[TRACE] The command has been uploaded: %s - %s, %s\n", xD_command, oper1, oper2);
         strcpy(commands_for_compile[code_compile_count].name, xD_command);
         commands_for_compile[code_compile_count].code = command_code;
-        commands_for_compile[code_compile_count].oper1 = (uint8_t)oper1;
-        commands_for_compile[code_compile_count].oper2 = (uint8_t)oper2;
-        commands_for_compile[code_compile_count].oper3 = 0;
+        strcpy(commands_for_compile[code_compile_count].oper1, oper1);
+        strcpy(commands_for_compile[code_compile_count].oper2, oper2);
+        commands_for_compile[code_compile_count].oper3[0] = '\0';
         commands_for_compile[code_compile_count].cell = 2;
         code_compile_count++;
     }
     else {
         // команда с 3 операндами
-        if(trace) printf("[TRACE] The command has been uploaded: %s - %d, %d, %d\n", xD_command, oper1, oper2, oper3);
+        if(trace) printf("[TRACE] The command has been uploaded: %s - %s, %s, %s\n", xD_command, oper1, oper2, oper3);
         strcpy(commands_for_compile[code_compile_count].name, xD_command);
         commands_for_compile[code_compile_count].code = command_code;
-        commands_for_compile[code_compile_count].oper1 = (uint8_t)oper1;
-        commands_for_compile[code_compile_count].oper2 = (uint8_t)oper2;
-        commands_for_compile[code_compile_count].oper3 = (uint8_t)oper3;
+        strcpy(commands_for_compile[code_compile_count].oper1, oper1);
+        strcpy(commands_for_compile[code_compile_count].oper2, oper2);
+        strcpy(commands_for_compile[code_compile_count].oper3, oper3);
         commands_for_compile[code_compile_count].cell = 3;
         code_compile_count++;
     }
@@ -396,7 +419,9 @@ void parse_line(char* line) {
 
 void first_pass(void) {
     if(trace) printf("=== FIRST PASS ===\n");
-    add_command_for_compile("input", -1, -1, -1);
+    for(int i = 0; i < sizeof(commands_for_compile)/sizeof(commands_for_compile[0]); i++){ //меняем метки на адреса, переменные на значения либо адреса строк
+        
+    }
 }
 
 void second_pass(void) {
@@ -520,7 +545,6 @@ void in_bin(char* path) {
 }
 
 void compile_commands(void) {
-    // Заглушка - просто запускаем два прохода
     first_pass();
     second_pass();
 }
@@ -552,9 +576,9 @@ int main(int argc, char **argv) {
     {
         char line[256] = {0};
         char xD_command[100] = {0};
-        char oper1[100] = {NO_OPERAND};
-        char oper2[100] = {NO_OPERAND};
-        char oper3[100] = {NO_OPERAND};
+        char oper1[32] = {NO_OPERAND};
+        char oper2[32] = {NO_OPERAND};
+        char oper3[32] = {NO_OPERAND};
 
         printf("> ");
         
@@ -565,9 +589,9 @@ int main(int argc, char **argv) {
             if (((oper1[0] >= '0' || oper1[0] <= '9') || (oper2[0] >= '0' || oper2[0] <= '9') || (oper3[0] >= '0' || oper3[0] <= '9')) != 1){
                 for(int i = 0; i < ((sizeof(variables))/(sizeof(variables[0]))); i++){
                     char* name = variables[i].name;
-                    if (strcmp(name, oper1) == 1) memset(oper1, 0, sizeof(oper1));oper1[0] = variables[i].value.word; printf("[TRACE] Oper1 var is: %d", oper1[0]);
-                    if (strcmp(name, oper2) == 1) memset(oper2, 0, sizeof(oper2));oper2[0] = variables[i].value.word; printf("[TRACE] Oper2 var is: %d", oper1[0]);
-                    if (strcmp(name, oper3) == 1) memset(oper3, 0, sizeof(oper3));oper3[0] = variables[i].value.word; printf("[TRACE] Oper3 var is: %d", oper1[0]);
+                    if (strcmp(name, oper1) == 1) {memset(oper1, 0, sizeof(oper1));oper1[0] = variables[i].value.word; printf("[TRACE] Oper1 var is: %d", oper1[0]);}
+                    if (strcmp(name, oper2) == 1) {memset(oper2, 0, sizeof(oper2));oper2[0] = variables[i].value.word; printf("[TRACE] Oper2 var is: %d", oper1[0]);}
+                    if (strcmp(name, oper3) == 1) {memset(oper3, 0, sizeof(oper3));oper3[0] = variables[i].value.word; printf("[TRACE] Oper3 var is: %d", oper1[0]);}
                 }
             }
             if(trace) {
@@ -588,67 +612,63 @@ int main(int argc, char **argv) {
             break;
         }
         
-        if(strcmp(oper1, "=") == 0) //если создаем переменную
-        {
+        if(strcmp(oper1, "=") == 0) {//если создаем переменную
             if(trace) printf("[TRACE] Processing assignment operation\n");
+            short index = find_variable(xD_command);
+            if (trace) printf("[TRACE] INDEX IS: %d \n", index);
+            if (index >= 0){//присваиваем переменную
             
-            if (find_variable(oper2) != -1) //присваиваем переменную
-            {
-                if(trace) printf("[TRACE] Source variable '%s' found\n", oper2);
+                if(trace) printf("[TRACE] Source variable '%s' found\n", xD_command);
                 
-                char name[25] = {0};
                 char type[10] = {0};
-                int number_of_var;
+                strcpy(type, variables[index].type);
                 char var_id[6];
-                strcpy(name, oper2);
-                for(int i = 0; i < sizeof(variables)/sizeof(variables[0]); i++){
-                    if(strcmp("byte", variables[i].type) == 0 || strcmp("word", variables[i].type) == 0){
-                        if (strcmp(name, variables[i].name) == 0){
-                            number_of_var = i;
-                            strcpy(type, variables[number_of_var].type);
-                            
-                            if(trace) printf("[TRACE] Found variable at index %d, type: %s\n", i, type);
-                            
-                            if ((variables[number_of_var].value.word >> 8) == 0){
-                                strcpy(var_id, "byte");
-                                if(trace) printf("[TRACE] Value fits in byte: %u\n", variables[number_of_var].value.word);
-                            }
-                            else{
-                                strcpy(var_id, "word");
-                                if(trace) printf("[TRACE] Value requires word: %u\n", variables[number_of_var].value.word);
-                            }
-                            break;
-                        }
-                    }
-                    else if(strcmp("str", variables[i].type) == 0){
-                        if (strcmp(name, variables[i].name) == 0){
-                            number_of_var = i;
-                            strcpy(var_id, "str");
-                            if(trace) printf("[TRACE] Value is str: %u\n", variables[number_of_var].value.byte);
-                            break;
-                        }
-                    }
-                }
+                int adres = variables[index].adres;
+                union
+                {
+                    uint8_t byte;
+                    uint16_t word;
+                } value;
+                delete_variable(xD_command);
+                if(trace) printf("[TRACE] Found variable at index %d, type: %s\n", index, type);
                 
-                if (strcmp(var_id, "word") == 0){
-                    add_variable(xD_command, data_adress_count++, type, variables[number_of_var].value.word);
-                    if(trace) printf("[TRACE] Created word variable '%s' with value %u\n", 
-                           xD_command, variables[number_of_var].value.word);
+                if (strcmp(type, "byte") == 0 || strcmp(type, "word") == 0) {
+                    if ((variables[index].value.word >> 8) == 0) {
+                        strcpy(var_id, "byte");
+                        if(trace) printf("[TRACE] Value fits in byte: %u\n", value.byte);
+                    }
+                    else {
+                        strcpy(var_id, "word");
+                        if(trace) printf("[TRACE] Value requires word: %u\n", value.word);
+                    }
+                    value.word = string_to_int(oper2);
                 }
-                else if(strcmp(var_id, "byte") == 0){
-                    add_variable(xD_command, data_adress_count++, type, variables[number_of_var].value.byte);
-                    if(trace) printf("[TRACE] Created byte variable '%s' with value %u\n", 
-                           xD_command, variables[number_of_var].value.byte);
+                else if (strcmp(type, "str") == 0) {
+                    strcpy(var_id, "str");
+                    if(trace) printf("[TRACE] Value is str: first char '%c'\n", (char)value.byte);
+                    value.byte = oper2[0];
                 }
-                else if(strcmp(var_id, "str") == 0){
-                    add_variable(xD_command, variables[number_of_var].adres, "str", variables[number_of_var].value.byte);
-                    data_adress_count -= 1; //в добавление переменной есть ++, поэтому уменьшаем
-                    if(trace) printf("[TRACE] Created str variable '%s' with adres %u\n", 
-                           xD_command, variables[number_of_var].adres);
-                    print_symbol_table();       
+                else {
+                    error("Unknown variable type");
                 }
 
+                if (strcmp(var_id, "word") == 0) {
+                    add_variable(xD_command, adres, type, value.word);
+                    if(trace) printf("[TRACE] Created word variable '%s' with value %u\n", 
+                        xD_command, variables[index].value.word);
+                }
+                else if (strcmp(var_id, "byte") == 0) {
+                    add_variable(xD_command, adres, type, value.byte);
+                    if(trace) printf("[TRACE] Created byte variable '%s' with value %u\n",
+                        xD_command, string_to_int(oper2));
+                }
+                else if (strcmp(var_id, "str") == 0) {
+                    add_variable(xD_command, adres, "str", value.byte);
+                    if(trace) printf("[TRACE] Created str variable '%s' with adres %u\n", 
+                        xD_command, adres);
+                }
                 else error("No type var");
+                print_symbol_table();
             }
             else
             {   
@@ -661,12 +681,14 @@ int main(int argc, char **argv) {
                             count++;
                         }
                         add_variable(xD_command, (data_adress_count-count), "str", oper2[0]);
+                        index = find_variable(xD_command);
+                        variables[index].count = count;
                         if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", string is: \"%s\", adres: %d\n", xD_command, oper2, data_adress_count - count - 1);
                     }
                     else{
                         int value = string_to_int(oper2);
-                        if (value > 255) {add_variable(xD_command, data_adress_count, "word", value); data_adress_count++;}
-                        else {add_variable(xD_command, data_adress_count, "byte", value);}
+                        if (value > 255) {add_variable(xD_command, data_adress_count, "word", value); data_adress_count++; variables[index].count = 2;}
+                        else {add_variable(xD_command, data_adress_count, "byte", value); variables[index].count = 1;}
                         if(trace) printf("[TRACE] Source variable was created, name is: \"%s\", value is: \"%d\", adres: %d\n", xD_command, value, data_adress_count - 1);
                     }
                     print_symbol_table();
@@ -677,9 +699,8 @@ int main(int argc, char **argv) {
 
             }
         }
-
         else{
-            add_command_for_compile(xD_command, oper1[0], oper2[0], oper3[0]);
+            add_command_for_compile(xD_command, oper1, oper2, oper3);
         }
         
         if(trace) printf("[TRACE] Data address count: %d, Labels count: %d\n", 
