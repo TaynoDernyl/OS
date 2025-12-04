@@ -104,7 +104,7 @@ void compile_add(char* dest, char* src);
 void compile_sub(char* dest, char* src);
 void compile_inc(char* reg);
 void compile_dec(char* reg);
-void compile_jmp(char* label);
+void compile_jmp(int address);
 void compile_jz(char* label);
 void compile_jnz(char* label);
 void compile_cmp(char* op1, char* op2);
@@ -156,7 +156,7 @@ bool valid_reg(char* reg);
 bool valid_label(char* label);
 bool valid_var(char* variable);
 int string_to_int(const char* str);
-
+void int_to_string(int, char*);
 //функции для записи - чтения
 void read_swag(char* path);
 void in_bin(char* path);
