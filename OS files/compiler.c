@@ -39,6 +39,40 @@ bool valid_reg(char* reg) {
     return false;
 }
 
+void int_to_string(int number, char* out) {
+    char buffer[32];
+    int i = 0;
+    int sign = number < 0 ? -1 : 1;
+
+    if (number == 0) {
+        out[0] = '0';
+        out[1] = '\0';
+        return;
+    }
+
+    number *= sign;
+
+    while (number > 0) {
+        buffer[i++] = (number % 10) + '0';
+        number /= 10;
+    }
+
+    if (sign < 0) {
+        buffer[i++] = '-';
+    }
+
+    buffer[i] = '\0';
+
+    // Разворачиваем в out
+    int len = i;
+    for (int j = 0; j < len; j++) {
+        out[j] = buffer[len - j - 1];
+    }
+    out[len] = '\0';
+
+}
+
+
 bool valid_label(char* label) {
     // Базовая проверка - не пустая строка
     return label != NULL && strlen(label) > 0;
@@ -71,6 +105,7 @@ void add_label(char* name, uint16_t address) {
 }
 
 void add_variable(char* name, uint16_t address, char* type, uint16_t value, uint8_t count) {
+    if (valid_reg(name) == true) error("name is reg");
     if(var_count < 250) {
         strncpy(variables[var_count].name, name, 32);
         strncpy(variables[var_count].type, type, 10);
@@ -311,17 +346,9 @@ void compile_dec(char* reg) {
     binary_output[code_adress_count++] = reg_code;
 }
 
-void compile_jmp(char* label) {
-    if(trace) printf("JMP %s\n", label);
-    
-    int label_idx = find_label(label);
-    if(label_idx == -1) {
-        error("Undefined label in JMP");
-        return;
-    }
-    
-    uint16_t address = labels[label_idx].adres;
-    
+void compile_jmp(int address) {
+    if(trace) printf("[TRACE] JMP %d\n", address);
+    address = (uint16_t)address;
     binary_output[code_adress_count++] = 0x0B; // JMP opcode
     binary_output[code_adress_count++] = address & 0xFF;        // low byte
     binary_output[code_adress_count++] = (address >> 8) & 0xFF; // high byte
@@ -387,7 +414,7 @@ void compile_stop(void) {
 
 void compile_setv(char* x, char* y, char* color) {
     if(trace) printf("SETV %s, %s, %s\n", x, y, color);
-    
+
     uint8_t x_code = get_reg_code(x);
     uint8_t y_code = get_reg_code(y);
     uint8_t color_code = get_reg_code(color);
@@ -424,6 +451,17 @@ void first_pass(void) {
     if(trace) printf("=== FIRST PASS ===\n");
     for(int i = 0; i < sizeof(commands_for_compile)/sizeof(commands_for_compile[0]); i++){ //меняем метки на адреса, переменные на значения либо адреса строк
         
+        if (commands_for_compile[i].name[0] == '\0') continue;
+        int index_label = find_label(commands_for_compile[i].oper1);
+        int index_var = find_variable(commands_for_compile[i].oper1);
+        if(trace) printf("[TRACE] INDEX var:%d, INDEX label:%d\n", index_var, index_label);
+
+        if (index_var >= 0) {
+            char string[32];
+            int_to_string((int)variables[index_var].value.word, string);
+            strcpy(commands_for_compile[i].oper1, string);
+            if (trace) printf("[TRACE] oper1 (i = %d) var is: %s\n",i, commands_for_compile[i].oper1);
+        }
     }
 }
 
@@ -816,10 +854,11 @@ int main(int argc, char **argv) {
         }
         else{
             add_command_for_compile(xD_command, oper1, oper2, oper3);
+            compile();   
         }
         
         if(trace) printf("[TRACE] Data address count: %d, Labels count: %d\n", 
-               data_adress_count, labels_count);
+               data_adress_count, labels_count);  
     }
     
     if(trace) printf("=== Compilation finished ===\n");
