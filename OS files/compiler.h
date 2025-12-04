@@ -95,6 +95,8 @@ type_command commands_for_compile[400];
 void add_command_for_compile(char* xD_comamd, char* oper1, char* oper2, char* oper3);
 int find_code_command(char* command);
 char* find_function_name(uint8_t code);
+void handle_existing_variable_assignment(char* var_name, char* oper2, int index);
+void create_new_variable(char* var_name, char* oper2);
 void compile_load(char* reg, int adres);
 void compile_store(int adres, char* reg);
 void compile_mov(char* dest, char* src);
@@ -169,7 +171,7 @@ void compile_commands(void);
 
 // работа с символами
 void add_label(char* name, uint16_t address);
-void add_variable(char* name, uint16_t address, char* type, uint16_t value);
+void add_variable(char* name, uint16_t address, char* type, uint16_t value, uint8_t count);
 int delete_variable(char* name);
 int delete_label(char* name);
 int find_label(char* name);
