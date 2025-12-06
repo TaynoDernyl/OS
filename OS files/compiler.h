@@ -93,32 +93,32 @@ type_command commands_for_compile[400];
 
 //функции компилятора
 void add_command_for_compile(char* xD_comamd, char* oper1, char* oper2, char* oper3);
-int find_code_command(char* command);
+uint8_t find_code_command(char* command);
 char* find_function_name(uint8_t code);
 void handle_existing_variable_assignment(char* var_name, char* oper2, int index);
 void create_new_variable(char* var_name, char* oper2);
-void compile_load(char* reg, int adres);
-void compile_store(int adres, char* reg);
-void compile_mov(char* dest, char* src);
-void compile_add(char* dest, char* src);
-void compile_sub(char* dest, char* src);
-void compile_inc(char* reg);
-void compile_dec(char* reg);
+void compile_load(int reg_code, int address);
+void compile_store(int address, int reg_code);
+void compile_mov(int dest_code, int src_code);
+void compile_add(int dest_code, int src_code);
+void compile_sub(int dest_code, int src_code);
+void compile_inc(int reg_code);
+void compile_dec(int reg_code);
 void compile_jmp(int address);
-void compile_jz(char* label);
-void compile_jnz(char* label);
-void compile_cmp(char* op1, char* op2);
-void compile_lt(char* reg1, char* reg2);
-void compile_gt(char* reg1, char* reg2);
+void compile_jz(int label_address);
+void compile_jnz(int label_address);
+void compile_cmp(int op1_code, int op2_code);
+void compile_lt(int reg1_code, int reg2_code);
+void compile_gt(int reg1_code, int reg2_code);
 void compile_print(void);
 void compile_input(void);
 void compile_stop(void);
-void compile_setv(char* x, char* y, char* color);
+void compile_setv(int x_code, int y_code, int color_code);
 void compile_render(void);
 void compile_init(void);
 void compile_printstr(void);
+void compile_stop(void);
 
-// обновленная структура с информацией о аргументах
 typedef struct type_table_command {
     char name[10];
     uint8_t code;
@@ -139,7 +139,7 @@ type_table_command commands[] = {
     {"jnz", 0x0d, 2, (void(*)(void))compile_jnz},
     {"print", 0x0e, 0, (void(*)(void))compile_print},
     {"printstr", 0x10, 0, (void(*)(void))compile_printstr},
-    {"printstr", 0x20, 2, (void(*)(void))compile_mov},
+    {"mov", 0x20, 2, (void(*)(void))compile_mov},
     {"input", 0xf9, 0, (void(*)(void))compile_input},
     {"stop", 0xff, 0, (void(*)(void))compile_stop},
     {"setv", 0x30, 3, (void(*)(void))compile_setv},
@@ -148,10 +148,32 @@ type_table_command commands[] = {
     {"cmp", 0xd0, 2, (void(*)(void))compile_cmp},
     {"<", 0xd1, 2, (void(*)(void))compile_lt},
     {">", 0xd2, 2, (void(*)(void))compile_gt},
+    {"stop", 0xff, 0, (void(*)(void))compile_stop},
     {"", 0, 0, NULL}
 };
 
+typedef struct
+{
+    char name[20];
+    void (*function)(void);
+} systemcommand;
+// Системные команды компилятора
+void print_binary_info(void);     // bin - вывод бинарной информации
+void reset_compiler(void);        // reset - сброс состояния компилятора
+void print_symbol_table(void);    // vars/labels - вывод таблицы символов
+void compile(void);
+systemcommand systemcommands[] =
+{
+    {"bin", (void(*)(void))print_binary_info},
+    {"reset", (void(*)(void))reset_compiler},
+    {"vars", (void(*)(void))print_symbol_table},
+    {"labels", (void(*)(void))print_symbol_table},
+    {"compile", (void(*)(void))compile},
+    {"", NULL}  // Терминатор массива
+};
+
 //функции валидности
+int if_system_command(char*);
 bool valid_reg(char* reg);
 bool valid_label(char* label);
 bool valid_var(char* variable);
@@ -160,6 +182,7 @@ void int_to_string(int, char*);
 //функции для записи - чтения
 void read_swag(char* path);
 void in_bin(char* path);
+
 
 //прерывания ошибки
 void error(char* user_input);
