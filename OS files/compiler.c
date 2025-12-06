@@ -25,6 +25,17 @@ bool word_or_byte(uint16_t number){
     else return 1;
 }
 
+int if_system_command(char* name){
+    bool if_true;
+    for (int i = 0;i < (sizeof(systemcommands) / sizeof(systemcommand)); i++){
+        if (strcmp(name, systemcommands[i].name) == 0){
+            if_true = 1;
+            return i;
+        }
+    }
+    if (if_true == 0) return -1;
+}
+
 void error(char* user_input) {
     printf("[ERROR]: %s\n", user_input);
     exit(1);
@@ -83,7 +94,7 @@ bool valid_var(char* variable) {
     return variable != NULL && strlen(variable) > 0;
 }
 
-int find_code_command(char* command){
+uint8_t find_code_command(char* command){
     for(int i = 0; i < (sizeof(commands))/(sizeof(commands[0])); i++){
         if ((strcmp(command, commands[i].name) == 0)){
             if (trace) printf("[TRACE] Command found! %02X\n", commands[i].code);
@@ -160,15 +171,19 @@ int find_label(char* name) {
 
 int find_variable(char* name) {
     if (trace) printf("[TRACE] Finding a \'%s\' in: %d\n", name, var_count);
+    bool found;
     for(int i = 0; i < var_count; i++) {
         if (trace) printf("[TRACE] Now name is: %s, index = %d\n", variables[i].name, i);
         if(strcmp(variables[i].name, name) == 0) {
             if (trace) printf("[TRACE] Var found at index = %d (name:%s)!\n", i, variables[i].name);
             return i;
+            found = 1;
         }
     }
-    if (trace) printf("[TRACE] Var not found\n");
-    return -1;
+    if (found == 0){
+        if (trace) printf("[TRACE] Var is not found");
+        return -1;
+    }
 }
 
 // ==================== КОДЫ РЕГИСТРОВ ====================
@@ -237,207 +252,148 @@ void add_command_for_compile(char* xD_command, char* oper1, char* oper2, char* o
     }
 }
 
-void compile_load(char* reg, int address) {
-    if(trace) printf("compile_load: %s, %d\n", reg, address);
-    
-    uint8_t reg_code = get_reg_code(reg);
+void compile_load(int reg_code, int address) {
+    if(trace) printf("compile_load: reg=%d, addr=%d\n", reg_code, address);
     
     binary_output[code_adress_count++] = 0x04; // load opcode
-    binary_output[code_adress_count++] = reg_code;
-    binary_output[code_adress_count++] = address & 0xff;
-    binary_output[code_adress_count++] = (address >> 8) & 0xff;
+    binary_output[code_adress_count++] = reg_code & 0xFF;
+    binary_output[code_adress_count++] = address & 0xFF;
+    binary_output[code_adress_count++] = (address >> 8) & 0xFF;
 }
 
-void compile_store(int address, char* reg) {
-    if(trace) printf("compile_store: %d, %s\n", address, reg);
-    
-    uint8_t reg_code = get_reg_code(reg);
+void compile_store(int address, int reg_code) {
+    if(trace) printf("compile_store: addr=%d, reg=%d\n", address, reg_code);
     
     binary_output[code_adress_count++] = 0x05; // store opcode
-    binary_output[code_adress_count++] = reg_code;
-    binary_output[code_adress_count++] = address & 0xff;
-    binary_output[code_adress_count++] = (address >> 8) & 0xff;
+    binary_output[code_adress_count++] = reg_code & 0xFF;
+    binary_output[code_adress_count++] = address & 0xFF;
+    binary_output[code_adress_count++] = (address >> 8) & 0xFF;
 }
 
-void compile_lt(char* reg1, char* reg2) {
-    if(trace) printf("compile_lt: %s, %s\n", reg1, reg2);
+void compile_mov(int dest_code, int src_code) {
+    if(trace) printf("compile_mov: dest=%d, src=%d\n", dest_code, src_code);
     
-    uint8_t reg1_code = get_reg_code(reg1);
-    uint8_t reg2_code = get_reg_code(reg2);
-    
-    binary_output[code_adress_count++] = 0xd1; // < opcode
-    binary_output[code_adress_count++] = reg1_code;
-    binary_output[code_adress_count++] = reg2_code;
+    binary_output[code_adress_count++] = 0x20; // MOV opcode
+    binary_output[code_adress_count++] = 0x00; // flags (0 для 8-bit, 1 для 16-bit)
+    binary_output[code_adress_count++] = dest_code & 0xFF;
+    binary_output[code_adress_count++] = src_code & 0xFF;
 }
 
-void compile_gt(char* reg1, char* reg2) {
-    if(trace) printf("compile_gt: %s, %s\n", reg1, reg2);
-    
-    uint8_t reg1_code = get_reg_code(reg1);
-    uint8_t reg2_code = get_reg_code(reg2);
-    
-    binary_output[code_adress_count++] = 0xd2; // > opcode
-    binary_output[code_adress_count++] = reg1_code;
-    binary_output[code_adress_count++] = reg2_code;
-}
-
-void compile_mov(char* dest, char* src) {
-    if(trace) printf("MOV %s, %s\n", dest, src);
-    
-    uint8_t dest_code = get_reg_code(dest);
-    uint8_t src_code = get_reg_code(src);
-    
-    // Определяем размер операндов
-    uint8_t flags = 0;
-    if (dest_code <= MAX_REG) { // 8-bit регистры
-        flags = 0;
-        binary_output[code_adress_count++] = 0x20; // MOV opcode
-        binary_output[code_adress_count++] = flags;
-        binary_output[code_adress_count++] = dest_code;
-        binary_output[code_adress_count++] = src_code;
-    } else { // 16-bit регистры
-        flags = 1;
-        binary_output[code_adress_count++] = 0x20; // MOV opcode
-        binary_output[code_adress_count++] = flags;
-        binary_output[code_adress_count++] = dest_code;
-        binary_output[code_adress_count++] = src_code;
-        // Для 16-bit MOV может потребоваться дополнительный байт
-        binary_output[code_adress_count++] = 0x00; // placeholder
-    }
-}
-
-void compile_add(char* dest, char* src) {
-    if(trace) printf("ADD %s, %s\n", dest, src);
-    
-    uint8_t dest_code = get_reg_code(dest);
-    uint8_t src_code = get_reg_code(src);
+void compile_add(int dest_code, int src_code) {
+    if(trace) printf("compile_add: dest=%d, src=%d\n", dest_code, src_code);
     
     binary_output[code_adress_count++] = 0x08; // ADD opcode
-    binary_output[code_adress_count++] = dest_code;
-    binary_output[code_adress_count++] = src_code;
+    binary_output[code_adress_count++] = dest_code & 0xFF;
+    binary_output[code_adress_count++] = src_code & 0xFF;
 }
 
-void compile_sub(char* dest, char* src) {
-    if(trace) printf("SUB %s, %s\n", dest, src);
-    
-    uint8_t dest_code = get_reg_code(dest);
-    uint8_t src_code = get_reg_code(src);
+void compile_sub(int dest_code, int src_code) {
+    if(trace) printf("compile_sub: dest=%d, src=%d\n", dest_code, src_code);
     
     binary_output[code_adress_count++] = 0x07; // SUB opcode
-    binary_output[code_adress_count++] = dest_code;
-    binary_output[code_adress_count++] = src_code;
+    binary_output[code_adress_count++] = dest_code & 0xFF;
+    binary_output[code_adress_count++] = src_code & 0xFF;
 }
 
-void compile_inc(char* reg) {
-    if(trace) printf("INC %s\n", reg);
-    
-    uint8_t reg_code = get_reg_code(reg);
+void compile_inc(int reg_code) {
+    if(trace) printf("compile_inc: reg=%d\n", reg_code);
     
     binary_output[code_adress_count++] = 0x09; // INC opcode
-    binary_output[code_adress_count++] = reg_code;
+    binary_output[code_adress_count++] = reg_code & 0xFF;
 }
 
-void compile_dec(char* reg) {
-    if(trace) printf("DEC %s\n", reg);
-    
-    uint8_t reg_code = get_reg_code(reg);
+void compile_dec(int reg_code) {
+    if(trace) printf("compile_dec: reg=%d\n", reg_code);
     
     binary_output[code_adress_count++] = 0x0A; // DEC opcode
-    binary_output[code_adress_count++] = reg_code;
+    binary_output[code_adress_count++] = reg_code & 0xFF;
 }
 
 void compile_jmp(int address) {
-    if(trace) printf("[TRACE] JMP %d\n", address);
-    address = (uint16_t)address;
+    if(trace) printf("compile_jmp: addr=%d\n", address);
+    
     binary_output[code_adress_count++] = 0x0B; // JMP opcode
-    binary_output[code_adress_count++] = address & 0xFF;        // low byte
-    binary_output[code_adress_count++] = (address >> 8) & 0xFF; // high byte
+    binary_output[code_adress_count++] = address & 0xFF;
+    binary_output[code_adress_count++] = (address >> 8) & 0xFF;
 }
 
-void compile_jz(char* label) {
-    if(trace) printf("JZ %s\n", label);
-    
-    int label_idx = find_label(label);
-    if(label_idx == -1) {
-        error("Undefined label in JZ");
-        return;
-    }
-    
-    uint16_t address = labels[label_idx].adres;
+void compile_jz(int label_address) {
+    if(trace) printf("compile_jz: label_addr=%d\n", label_address);
     
     binary_output[code_adress_count++] = 0x0C; // JZ opcode
-    binary_output[code_adress_count++] = address & 0xFF;        // low byte
-    binary_output[code_adress_count++] = (address >> 8) & 0xFF; // high byte
+    binary_output[code_adress_count++] = label_address & 0xFF;
+    binary_output[code_adress_count++] = (label_address >> 8) & 0xFF;
 }
 
-void compile_jnz(char* label) {
-    if(trace) printf("JNZ %s\n", label);
-    
-    int label_idx = find_label(label);
-    if(label_idx == -1) {
-        error("Undefined label in JNZ");
-        return;
-    }
-    
-    uint16_t address = labels[label_idx].adres;
+void compile_jnz(int label_address) {
+    if(trace) printf("compile_jnz: label_addr=%d\n", label_address);
     
     binary_output[code_adress_count++] = 0x0D; // JNZ opcode
-    binary_output[code_adress_count++] = address & 0xFF;        // low byte
-    binary_output[code_adress_count++] = (address >> 8) & 0xFF; // high byte
+    binary_output[code_adress_count++] = label_address & 0xFF;
+    binary_output[code_adress_count++] = (label_address >> 8) & 0xFF;
 }
 
-void compile_cmp(char* op1, char* op2) {
-    if(trace) printf("CMP %s, %s\n", op1, op2);
+void compile_cmp(int op1_code, int op2_code) {
+    if(trace) printf("compile_cmp: op1=%d, op2=%d\n", op1_code, op2_code);
     
-    uint8_t op1_code = get_reg_code(op1);
-    uint8_t op2_code = get_reg_code(op2);
+    binary_output[code_adress_count++] = 0xD0; // CMP opcode
+    binary_output[code_adress_count++] = op1_code & 0xFF;
+    binary_output[code_adress_count++] = op2_code & 0xFF;
+}
+
+void compile_lt(int reg1_code, int reg2_code) {
+    if(trace) printf("compile_lt: reg1=%d, reg2=%d\n", reg1_code, reg2_code);
     
-    binary_output[code_adress_count++] = 0xD0; // CMP (equal) opcode
-    binary_output[code_adress_count++] = op1_code;
-    binary_output[code_adress_count++] = op2_code;
+    binary_output[code_adress_count++] = 0xD1; // < opcode
+    binary_output[code_adress_count++] = reg1_code & 0xFF;
+    binary_output[code_adress_count++] = reg2_code & 0xFF;
+}
+
+void compile_gt(int reg1_code, int reg2_code) {
+    if(trace) printf("compile_gt: reg1=%d, reg2=%d\n", reg1_code, reg2_code);
+    
+    binary_output[code_adress_count++] = 0xD2; // > opcode
+    binary_output[code_adress_count++] = reg1_code & 0xFF;
+    binary_output[code_adress_count++] = reg2_code & 0xFF;
+}
+
+void compile_setv(int x_code, int y_code, int color_code) {
+    if(trace) printf("compile_setv: x=%d, y=%d, color=%d\n", x_code, y_code, color_code);
+    
+    binary_output[code_adress_count++] = 0x30; // SETV opcode
+    binary_output[code_adress_count++] = x_code & 0xFF;
+    binary_output[code_adress_count++] = y_code & 0xFF;
+    binary_output[code_adress_count++] = color_code & 0xFF;
 }
 
 void compile_print(void) {
-    if(trace) printf("PRINT\n");
-    binary_output[code_adress_count++] = 0x0E; // PRINT char opcode
+    if(trace) printf("compile_print\n");
+    binary_output[code_adress_count++] = 0x0E;
 }
 
 void compile_input(void) {
-    if(trace) printf("INPUT\n");
-    binary_output[code_adress_count++] = 0xF9; // INPUT opcode
-}
-
-void compile_stop(void) {
-    if(trace) printf("STOP\n");
-    binary_output[code_adress_count++] = 0xFF; // HALT opcode
-}
-
-void compile_setv(char* x, char* y, char* color) {
-    if(trace) printf("SETV %s, %s, %s\n", x, y, color);
-
-    uint8_t x_code = get_reg_code(x);
-    uint8_t y_code = get_reg_code(y);
-    uint8_t color_code = get_reg_code(color);
-    
-    binary_output[code_adress_count++] = 0x30; // SETV opcode
-    binary_output[code_adress_count++] = x_code;
-    binary_output[code_adress_count++] = y_code;
-    binary_output[code_adress_count++] = color_code;
+    if(trace) printf("compile_input\n");
+    binary_output[code_adress_count++] = 0xF9;
 }
 
 void compile_render(void) {
-    if(trace) printf("RENDER\n");
-    binary_output[code_adress_count++] = 0x31; // RENDER opcode
+    if(trace) printf("compile_render\n");
+    binary_output[code_adress_count++] = 0x31;
 }
 
 void compile_init(void) {
-    if(trace) printf("INIT\n");
-    binary_output[code_adress_count++] = 0x32; // INIT opcode
+    if(trace) printf("compile_init\n");
+    binary_output[code_adress_count++] = 0x32;
 }
 
 void compile_printstr(void) {
-    if(trace) printf("PRINTSTR\n");
-    binary_output[code_adress_count++] = 0x10; // PRINT_STR opcode
+    if(trace) printf("compile_printstr\n");
+    binary_output[code_adress_count++] = 0x10;
+}
+
+void compile_stop(void) {
+    if(trace) printf("compile_stop\n");
+    binary_output[code_adress_count++] = 0xFF;
 }
 
 // ==================== ПАРСИНГ И КОМПИЛЯЦИЯ ====================
@@ -484,9 +440,18 @@ void second_pass(void) {
         for(int j = 0; j < (sizeof(commands))/(sizeof(commands[0])); j++){
             if (strcmp(commands[j].name, name) == 0){
                 if (trace) printf("[TRACE] Found name: %s\n", commands[j].name);
+                
                 if(commands[j].function != NULL) {
-                    commands[j].function();
-                } else {
+                    switch(find_code_command(name))
+                    {
+                    case (0x0b):
+                        compile_jmp(string_to_int(commands_for_compile[i].oper1));
+                        break;
+                    default:
+                        error("Command name not found");
+                    }
+                }
+                else {
                     if(trace) printf("[TRACE] Function pointer is NULL\n");
                 }
                 break;
@@ -851,10 +816,12 @@ int main(int argc, char **argv) {
             else { // создаем новую переменную
                 create_new_variable(xD_command, oper2);
             }
+        } else if(if_system_command(xD_command) >= 0){
+            int index = if_system_command(xD_command);
+            systemcommands[index].function();
         }
         else{
             add_command_for_compile(xD_command, oper1, oper2, oper3);
-            compile();   
         }
         
         if(trace) printf("[TRACE] Data address count: %d, Labels count: %d\n", 
