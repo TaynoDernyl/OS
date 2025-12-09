@@ -837,7 +837,7 @@ int main(int argc, char **argv) {
     }
 
     if(trace){
-        printf("=== LETOS COMPILER v0.0.6 ===\n");
+        printf("=== LETOS COMPILER v0.0.7 ===\n");
         printf("Trace mode: ON\n");
     }
 
