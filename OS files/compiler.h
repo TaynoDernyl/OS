@@ -123,32 +123,32 @@ typedef struct type_table_command {
     char name[10];
     uint8_t code;
     uint8_t args_count;  // количество аргументов
-    void (*function)(void);   // универсальный указатель
+    void (*function)();   // универсальный указатель
 } type_table_command;
 
 type_table_command commands[] = {
     {"nop", 0x00, 0, NULL},         
-    {"load", 0x04, 2, (void(*)(void))compile_load},
-    {"store", 0x05, 2, (void(*)(void))compile_store},
-    {"sub", 0x07, 2, (void(*)(void))compile_sub},
-    {"add", 0x08, 2, (void(*)(void))compile_add},
-    {"inc", 0x09, 1, (void(*)(void))compile_inc},
-    {"dec", 0x0a, 1, (void(*)(void))compile_dec},
-    {"jmp", 0x0b, 2, (void(*)(void))compile_jmp},
-    {"jz", 0x0c, 2, (void(*)(void))compile_jz},
-    {"jnz", 0x0d, 2, (void(*)(void))compile_jnz},
-    {"print", 0x0e, 0, (void(*)(void))compile_print},
-    {"printstr", 0x10, 0, (void(*)(void))compile_printstr},
-    {"mov", 0x20, 2, (void(*)(void))compile_mov},
-    {"input", 0xf9, 0, (void(*)(void))compile_input},
-    {"stop", 0xff, 0, (void(*)(void))compile_stop},
-    {"setv", 0x30, 3, (void(*)(void))compile_setv},
-    {"render", 0x31, 0, (void(*)(void))compile_render},
-    {"init", 0x32, 0, (void(*)(void))compile_init},
-    {"cmp", 0xd0, 2, (void(*)(void))compile_cmp},
-    {"<", 0xd1, 2, (void(*)(void))compile_lt},
-    {">", 0xd2, 2, (void(*)(void))compile_gt},
-    {"stop", 0xff, 0, (void(*)(void))compile_stop},
+    {"load", 0x04, 2, compile_load},
+    {"store", 0x05, 2, compile_store},
+    {"sub", 0x07, 2, compile_sub},
+    {"add", 0x08, 2, compile_add},
+    {"inc", 0x09, 1, compile_inc},
+    {"dec", 0x0a, 1, compile_dec},
+    {"jmp", 0x0b, 2, compile_jmp},
+    {"jz", 0x0c, 2, compile_jz},
+    {"jnz", 0x0d, 2, compile_jnz},
+    {"print", 0x0e, 0, compile_print},
+    {"printstr", 0x10, 0, compile_printstr},
+    {"mov", 0x20, 2, compile_mov},
+    {"input", 0xf9, 0, compile_input},
+    {"stop", 0xff, 0, compile_stop},
+    {"setv", 0x30, 3, compile_setv},
+    {"render", 0x31, 0, compile_render},
+    {"init", 0x32, 0, compile_init},
+    {"cmp", 0xd0, 2, compile_cmp},
+    {"<", 0xd1, 2, compile_lt},
+    {">", 0xd2, 2, compile_gt},
+    {"stop", 0xff, 0, compile_stop},
     {"", 0, 0, NULL}
 };
 
