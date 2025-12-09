@@ -25,8 +25,22 @@ bool word_or_byte(uint16_t number){
     else return 1;
 }
 
+int bits_8_16(int reg){
+    for(int i = 0; i < (sizeof(registers) / sizeof(type_reg)); i++){
+        if (registers[i].code == reg){
+            return registers[i].bitness;
+        }
+    }
+}
+int name_of_reg(char* name){
+    for(int i = 0; i < (sizeof(registers) / sizeof(type_reg)); i++){
+        if (strcmp(name, registers[i].name) == 0){
+            return registers[i].code;
+        }
+    }
+}
 int if_system_command(char* name){
-    bool if_true;
+    bool if_true = false;
     for (int i = 0;i < (sizeof(systemcommands) / sizeof(systemcommand)); i++){
         if (strcmp(name, systemcommands[i].name) == 0){
             if_true = 1;
@@ -161,12 +175,17 @@ int delete_variable(char* name){
 }
 
 int find_label(char* name) {
+    bool found = false;
     for(int i = 0; i < labels_count; i++) {
-        if(strcmp(variables[i].name, name) == 0) {
+        if(strcmp(labels[i].name, name) == 0) {
+            found = true;
             return i;
         }
     }
-    return -1;
+    if (found == 0){
+        if (trace) printf("[TRACE] Var is not found");
+        return -1;
+    }
 }
 
 int find_variable(char* name) {
@@ -209,47 +228,48 @@ void add_command_for_compile(char* xD_command, char* oper1, char* oper2, char* o
     if (oper1[0] == NO_OPERAND && oper2[0] == NO_OPERAND && oper3[0] == NO_OPERAND) {
         // команда без операндов
         if(trace) printf("[TRACE] The command has been uploaded: %s (no operands)\n", xD_command);
-        strcpy(commands_for_compile[code_compile_count].name, xD_command);
-        commands_for_compile[code_compile_count].code = command_code;
-        commands_for_compile[code_compile_count].oper1[0] = '\0';
-        commands_for_compile[code_compile_count].oper2[0] = '\0';
-        commands_for_compile[code_compile_count].oper3[0] = '\0';
-        commands_for_compile[code_compile_count].cell = 0;
-        code_compile_count++;
+        strcpy(commands_for_compile[code_adress_count].name, xD_command);
+        commands_for_compile[code_adress_count].code = command_code;
+        commands_for_compile[code_adress_count].oper1[0] = '\0';
+        commands_for_compile[code_adress_count].oper2[0] = '\0';
+        commands_for_compile[code_adress_count].oper3[0] = '\0';
+        commands_for_compile[code_adress_count].cell = 0;
+        
     }
     else if (oper2[0] == NO_OPERAND && oper3[0] == NO_OPERAND) {
         // команда с 1 операндом
         if(trace) printf("[TRACE] The command has been uploaded: %s - %s\n", xD_command, oper1);
-        strcpy(commands_for_compile[code_compile_count].name, xD_command);
-        commands_for_compile[code_compile_count].code = command_code;
-        strcpy(commands_for_compile[code_compile_count].oper1, oper1);
-        commands_for_compile[code_compile_count].oper2[0] = '\0';
-        commands_for_compile[code_compile_count].oper3[0] = '\0';
-        commands_for_compile[code_compile_count].cell = 1;
-        code_compile_count++;
+        strcpy(commands_for_compile[code_adress_count].name, xD_command);
+        commands_for_compile[code_adress_count].code = command_code;
+        strcpy(commands_for_compile[code_adress_count].oper1, oper1);
+        commands_for_compile[code_adress_count].oper2[0] = '\0';
+        commands_for_compile[code_adress_count].oper3[0] = '\0';
+        commands_for_compile[code_adress_count].cell = 1;
+        
     }
     else if (oper3[0] == NO_OPERAND) {
         // команда с 2 операндами
         if(trace) printf("[TRACE] The command has been uploaded: %s - %s, %s\n", xD_command, oper1, oper2);
-        strcpy(commands_for_compile[code_compile_count].name, xD_command);
-        commands_for_compile[code_compile_count].code = command_code;
-        strcpy(commands_for_compile[code_compile_count].oper1, oper1);
-        strcpy(commands_for_compile[code_compile_count].oper2, oper2);
-        commands_for_compile[code_compile_count].oper3[0] = '\0';
-        commands_for_compile[code_compile_count].cell = 2;
-        code_compile_count++;
+        strcpy(commands_for_compile[code_adress_count].name, xD_command);
+        commands_for_compile[code_adress_count].code = command_code;
+        strcpy(commands_for_compile[code_adress_count].oper1, oper1);
+        strcpy(commands_for_compile[code_adress_count].oper2, oper2);
+        commands_for_compile[code_adress_count].oper3[0] = '\0';
+        commands_for_compile[code_adress_count].cell = 2;
+        
     }
     else {
         // команда с 3 операндами
         if(trace) printf("[TRACE] The command has been uploaded: %s - %s, %s, %s\n", xD_command, oper1, oper2, oper3);
-        strcpy(commands_for_compile[code_compile_count].name, xD_command);
-        commands_for_compile[code_compile_count].code = command_code;
-        strcpy(commands_for_compile[code_compile_count].oper1, oper1);
-        strcpy(commands_for_compile[code_compile_count].oper2, oper2);
-        strcpy(commands_for_compile[code_compile_count].oper3, oper3);
-        commands_for_compile[code_compile_count].cell = 3;
-        code_compile_count++;
+        strcpy(commands_for_compile[code_adress_count].name, xD_command);
+        commands_for_compile[code_adress_count].code = command_code;
+        strcpy(commands_for_compile[code_adress_count].oper1, oper1);
+        strcpy(commands_for_compile[code_adress_count].oper2, oper2);
+        strcpy(commands_for_compile[code_adress_count].oper3, oper3);
+        commands_for_compile[code_adress_count].cell = 3;
+        
     }
+    code_adress_count++;
 }
 
 void compile_load(int reg_code, int address) {
@@ -274,7 +294,8 @@ void compile_mov(int dest_code, int src_code) {
     if(trace) printf("compile_mov: dest=%d, src=%d\n", dest_code, src_code);
     
     binary_output[code_adress_count++] = 0x20; // MOV opcode
-    binary_output[code_adress_count++] = 0x00; // flags (0 для 8-bit, 1 для 16-bit)
+    if (bits_8_16(dest_code) == 8) binary_output[code_adress_count++] = 0x00; // flags (0 для 8-bit, 1 для 16-bit)
+    if (bits_8_16(dest_code) == 16) binary_output[code_adress_count++] = 0x01;
     binary_output[code_adress_count++] = dest_code & 0xFF;
     binary_output[code_adress_count++] = src_code & 0xFF;
 }
@@ -418,6 +439,49 @@ void first_pass(void) {
             strcpy(commands_for_compile[i].oper1, string);
             if (trace) printf("[TRACE] oper1 (i = %d) var is: %s\n",i, commands_for_compile[i].oper1);
         }
+
+        if (index_label >= 0) {
+            char string[32];
+            int_to_string((int)labels[index_label].adres, string);
+            strcpy(commands_for_compile[i].oper1, string);
+            if (trace) printf("[TRACE] oper1 (i = %d) lab is: %s\n",i, commands_for_compile[i].oper1);
+        }
+
+        index_label = find_label(commands_for_compile[i].oper2);
+        index_var = find_variable(commands_for_compile[i].oper2);
+        if(trace) printf("[TRACE] INDEX var:%d, INDEX label:%d\n", index_var, index_label);
+
+        if (index_var >= 0) {
+            char string[32];
+            int_to_string((int)variables[index_var].value.word, string);
+            strcpy(commands_for_compile[i].oper2, string);
+            if (trace) printf("[TRACE] oper2 (i = %d) var is: %s\n",i, commands_for_compile[i].oper2);
+        }
+
+        if (index_label >= 0) {
+            char string[32];
+            int_to_string((int)labels[index_label].adres, string);
+            strcpy(commands_for_compile[i].oper2, string);
+            if (trace) printf("[TRACE] oper2 (i = %d) lab is: %s\n",i, commands_for_compile[i].oper2);
+        }
+
+        index_label = find_label(commands_for_compile[i].oper3);
+        index_var = find_variable(commands_for_compile[i].oper3);
+        if(trace) printf("[TRACE] INDEX var:%d, INDEX label:%d\n", index_var, index_label);
+
+        if (index_var >= 0) {
+            char string[32];
+            int_to_string((int)variables[index_var].value.word, string);
+            strcpy(commands_for_compile[i].oper3, string);
+            if (trace) printf("[TRACE] oper3 (i = %d) var is: %s\n",i, commands_for_compile[i].oper1);
+        }
+
+        if (index_label >= 0) {
+            char string[32];
+            int_to_string((int)labels[index_label].adres, string);
+            strcpy(commands_for_compile[i].oper3, string);
+            if (trace) printf("[TRACE] oper3 (i = %d) lab is: %s\n",i, commands_for_compile[i].oper3);
+        }
     }
 }
 
@@ -442,14 +506,23 @@ void second_pass(void) {
                 if (trace) printf("[TRACE] Found name: %s\n", commands[j].name);
                 
                 if(commands[j].function != NULL) {
+                    short cell = commands_for_compile[i].cell;
+                    if (cell == 0) commands[j].function();
+                    if (cell == 1) commands[j].function(string_to_int(commands_for_compile[i].oper1));
+                    if (cell == 2) commands[j].function(string_to_int(commands_for_compile[i].oper1), string_to_int(commands_for_compile[i].oper2));
+                    if (cell == 3) commands[j].function(string_to_int(commands_for_compile[i].oper1), string_to_int(commands_for_compile[i].oper2), string_to_int(commands_for_compile[i].oper3));
+                    /*
                     switch(find_code_command(name))
                     {
+                    case (0x04):
+                        compile_load(get_reg_code(commands_for_compile[i].oper1), string_to_int(commands_for_compile[i].oper2));
+                        break;
                     case (0x0b):
                         compile_jmp(string_to_int(commands_for_compile[i].oper1));
                         break;
                     default:
                         error("Command name not found");
-                    }
+                    }*/
                 }
                 else {
                     if(trace) printf("[TRACE] Function pointer is NULL\n");
@@ -468,6 +541,10 @@ void reset_compiler(void) {
 }
 
 void compile(void){
+    code_adress_count = 0;
+    for (int i = 0; i < sizeof(binary_output);i++){
+        binary_output[i] = '\0';
+    }
     first_pass();
     second_pass();
 }
@@ -819,13 +896,20 @@ int main(int argc, char **argv) {
         } else if(if_system_command(xD_command) >= 0){
             int index = if_system_command(xD_command);
             systemcommands[index].function();
+        } else if (strcmp(xD_command, "point") == 0){
+            add_label(oper1, (code_compile_count));
         }
         else{
+            for (int i = 0; i < (sizeof(commands)/sizeof(type_table_command));i++){
+                if (strcmp(commands[i].name, xD_command) == 0){
+                    code_compile_count += (commands[i].args_count + 1);
+                }
+            }
             add_command_for_compile(xD_command, oper1, oper2, oper3);
         }
         
-        if(trace) printf("[TRACE] Data address count: %d, Labels count: %d\n", 
-               data_adress_count, labels_count);  
+        if(trace) printf("[TRACE] Data address count: %d, Labels count: %d, Code compile: %d, Code adress: %d\n", 
+               data_adress_count, labels_count, code_compile_count, code_adress_count);  
     }
     
     if(trace) printf("=== Compilation finished ===\n");
