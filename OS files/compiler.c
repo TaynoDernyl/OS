@@ -25,6 +25,14 @@ bool word_or_byte(uint16_t number){
     else return 1;
 }
 
+void in_bin(char* name_file){
+    if (trace) printf("[TRACE] File name: %s\n", name_file);
+    FILE *file = fopen(name_file, "w");
+    if (file == NULL) error("File not created");
+    fwrite(binary_output,sizeof(uint8_t), code_compile_count, file);
+    fclose(file);
+}
+
 int bits_8_16(int reg){
     for(int i = 0; i < (sizeof(registers) / sizeof(type_reg)); i++){
         if (registers[i].code == reg){
@@ -95,17 +103,6 @@ void int_to_string(int number, char* out) {
     }
     out[len] = '\0';
 
-}
-
-
-bool valid_label(char* label) {
-    // Базовая проверка - не пустая строка
-    return label != NULL && strlen(label) > 0;
-}
-
-bool valid_var(char* variable) {
-    // Базовая проверка
-    return variable != NULL && strlen(variable) > 0;
 }
 
 uint8_t find_code_command(char* command){
@@ -531,6 +528,7 @@ void second_pass(void) {
             }
         }
     }
+    in_bin("test.bin");
 }
 void reset_compiler(void) {
     labels_count = 0;
@@ -798,7 +796,7 @@ void print_binary_info(void) {
         printf("\n=== BINARY OUTPUT ===\n");
         printf("Code size: %d bytes\n", code_adress_count);
         printf("First 16 bytes dump:\n");
-        for(int i = 0; i < code_adress_count && i < 16; i++) {
+        for(int i = 0; i < code_compile_count && i < 16; i++) {
             printf("%02X ", binary_output[i]);
         }
         printf("\n");
@@ -807,10 +805,6 @@ void print_binary_info(void) {
 
 void read_swag(char* path) {
     if(trace){printf("Reading file: %s (stub)\n", path);}
-}
-
-void in_bin(char* path) {
-    if(trace){printf("Writing binary file: %s (stub)\n", path);}
 }
 
 void compile_commands(void) {
