@@ -17,7 +17,86 @@
 #include "compiler.h" 
 #include <string.h>
 
+// ==================== ФУНКЦИЯ ЗАГРУЗКИ ФАЙЛА ====================
 
+void load_file(char* filename) {
+    if (trace) printf("[TRACE] Loading file: %s\n", filename);
+    
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        error("Error: Cannot open file ");
+        return;
+    }
+    
+    char line[256];
+    int line_num = 1;
+    
+    // Сбрасываем компилятор перед загрузкой нового файла
+    reset_compiler();
+    
+    while (fgets(line, sizeof(line), file)) {
+        // Убираем символ новой строки
+        size_t len = strlen(line);
+        if (len > 0 && line[len-1] == '\n') {
+            line[len-1] = '\0';
+        }
+        
+        // Пропускаем пустые строки и комментарии
+        if (line[0] == '\0' || line[0] == ';' || line[0] == '#') {
+            line_num++;
+            continue;
+        }
+        
+        if (trace) printf("[TRACE] Line %d: %s\n", line_num, line);
+        
+        // Парсим строку
+        char xD_command[100] = {0};
+        char oper1[32] = {NO_OPERAND};
+        char oper2[32] = {NO_OPERAND};
+        char oper3[32] = {NO_OPERAND};
+        
+        int args_read = sscanf(line, "%99s %99s %99s %99s", 
+                              xD_command, oper1, oper2, oper3);
+        
+        // Обрабатываем команды так же, как в интерактивном режиме
+        if(strcmp(oper1, "=") == 0) { // если создаем переменную
+            if(trace) printf("[TRACE] Processing assignment operation\n");
+            
+            short index = find_variable(xD_command);
+            if (trace) printf("[TRACE] INDEX IS: %d \n", index);
+            
+            if (index >= 0) { // переменная уже существует
+                handle_existing_variable_assignment(xD_command, oper2, index);
+            }
+            else { // создаем новую переменную
+                create_new_variable(xD_command, oper2);
+            }
+        } 
+        else if(if_system_command(xD_command) >= 0){
+            int index = if_system_command(xD_command);
+            systemcommands[index].function();
+        } 
+        else if (strcmp(xD_command, "point") == 0){
+            add_label(oper1, (code_compile_count));
+        }
+        else if (strlen(xD_command) > 0) { // обычная команда
+            // Обновляем code_compile_count для команд
+            for (int i = 0; i < (sizeof(commands)/sizeof(type_table_command)); i++){
+                if (strcmp(commands[i].name, xD_command) == 0){
+                    code_compile_count += (commands[i].args_count + 1);
+                }
+            }
+            add_command_for_compile(xD_command, oper1, oper2, oper3);
+        }
+        
+        line_num++;
+    }
+    
+    fclose(file);
+    printf("File %s loaded successfully (%d lines)\n", filename, line_num-1);
+    if(trace) printf("[TRACE] Data address count: %d, Labels count: %d, Code compile: %d\n", 
+           data_adress_count, labels_count, code_compile_count);
+}
 // ==================== РЕАЛИЗАЦИЯ БАЗОВЫХ ФУНКЦИЙ ====================
 
 bool word_or_byte(uint16_t number){
@@ -25,7 +104,7 @@ bool word_or_byte(uint16_t number){
     else return 1;
 }
 
-void in_bin(char* name_file){
+void in_bin(char name_file[32]){
     if (trace) printf("[TRACE] File name: %s\n", name_file);
     FILE *file = fopen(name_file, "w");
     if (file == NULL) error("File not created");
@@ -424,7 +503,26 @@ void parse_line(char* line) {
 void first_pass(void) {
     if(trace) printf("=== FIRST PASS ===\n");
     for(int i = 0; i < sizeof(commands_for_compile)/sizeof(commands_for_compile[0]); i++){ //меняем метки на адреса, переменные на значения либо адреса строк
-        
+        char code_string[32]; // Объявляем один раз в начале
+
+        if (get_reg_code(commands_for_compile[i].oper1) >= 0){
+            uint8_t code = get_reg_code(commands_for_compile[i].oper1); 
+            memset(commands_for_compile[i].oper1, 0, sizeof(commands_for_compile[i].oper1));
+            int_to_string(code, code_string);
+            strcpy(commands_for_compile[i].oper1, code_string);
+        }
+        if (get_reg_code(commands_for_compile[i].oper2) >= 0){
+            uint8_t code = get_reg_code(commands_for_compile[i].oper2); 
+            memset(commands_for_compile[i].oper2, 0, sizeof(commands_for_compile[i].oper2));
+            int_to_string(code, code_string); // Используем тот же массив
+            strcpy(commands_for_compile[i].oper2, code_string);
+        }
+        if (get_reg_code(commands_for_compile[i].oper3) >= 0){
+            uint8_t code = get_reg_code(commands_for_compile[i].oper3); 
+            memset(commands_for_compile[i].oper3, 0, sizeof(commands_for_compile[i].oper3));
+            int_to_string(code, code_string); // Используем тот же массив
+            strcpy(commands_for_compile[i].oper3, code_string);
+        }
         if (commands_for_compile[i].name[0] == '\0') continue;
         int index_label = find_label(commands_for_compile[i].oper1);
         int index_var = find_variable(commands_for_compile[i].oper1);
@@ -820,19 +918,56 @@ void test(){
 
 // ==================== MAIN ====================
 
+// ==================== MAIN ====================
+
 int main(int argc, char **argv) {
+    // Сбрасываем компилятор при старте
+    reset_compiler();
+    bool is_compile = true;
+    bool file_loaded = false;
+    
+    // Обрабатываем аргументы командной строки
     for(int i = 1; i < argc; i++){
-        if(strcmp(argv[i], "-t") == 0){ // если в аргументах есть -t то включаем трассировку, если нет то устанавливаем имя компилируемой программы
+        if(strcmp(argv[i], "-t") == 0){ // если в аргументах есть -t то включаем трассировку
             trace = true;
         }
+        else if(strcmp(argv[i], "-c") == 0 && i+1 < argc){ // компиляция файла
+            i++; // пропускаем -c
+            load_file(argv[i]);
+            compile();
+            printf("Compilation complete. Output: test.bin\n");
+            return 0;
+        }
         else{
-            proga = argv[i];
+            // Проверяем, имеет ли файл расширение .swg
+            char* ext = strrchr(argv[i], '.');
+            if(ext != NULL && (strcmp(ext, ".swg") == 0 || strcmp(ext, ".SWG") == 0)) {
+                load_file(argv[i]);
+                file_loaded = true;
+            } else {
+                printf("Warning: %s doesn't have .swg extension, loading anyway...\n", argv[i]);
+                load_file(argv[i]);
+                file_loaded = true;
+            }
         }
     }
-
+    
     if(trace){
         printf("=== LETOS COMPILER v0.0.7 ===\n");
         printf("Trace mode: ON\n");
+    }
+    
+    // Если файл загружен, показываем символьную таблицу
+    if(file_loaded) {
+        print_symbol_table();
+        printf("\nFile loaded. Enter commands or 'exit' to quit\n");
+    } else {
+        printf("=== LETOS COMPILER ===\n");
+        printf("Usage: compiler.exe [filename.swg] [-t] [-c filename.swg]\n");
+        printf("  filename.swg  - load and process file\n");
+        printf("  -t            - enable trace mode\n");
+        printf("  -c filename   - compile file and exit\n");
+        printf("\nEntering interactive mode...\n");
     }
 
     while (true)
@@ -843,20 +978,23 @@ int main(int argc, char **argv) {
         char oper2[32] = {NO_OPERAND};
         char oper3[32] = {NO_OPERAND};
 
-        printf("> ");
+        if (is_compile) printf("---> ");
+        else printf("***> ");
         
         // читаем всю строку
         if (fgets(line, sizeof(line), stdin)) {
+            // Убираем символ новой строки
+            size_t len = strlen(line);
+            if (len > 0 && line[len-1] == '\n') {
+                line[len-1] = '\0';
+            }
+            
+            // Пропускаем пустые строки
+            if (line[0] == '\0') continue;
+            
             // парсим строку
             int args_read = sscanf(line, "%99s %99s %99s %99s", xD_command, oper1, oper2, oper3);
-            if (((oper1[0] >= '0' || oper1[0] <= '9') || (oper2[0] >= '0' || oper2[0] <= '9') || (oper3[0] >= '0' || oper3[0] <= '9')) != 1){
-                for(int i = 0; i < ((sizeof(variables))/(sizeof(variables[0]))); i++){
-                    char* name = variables[i].name;
-                    if (strcmp(name, oper1) == 1) {memset(oper1, 0, sizeof(oper1));oper1[0] = variables[i].value.word; printf("[TRACE] Oper1 var is: %d", oper1[0]);}
-                    if (strcmp(name, oper2) == 1) {memset(oper2, 0, sizeof(oper2));oper2[0] = variables[i].value.word; printf("[TRACE] Oper2 var is: %d", oper1[0]);}
-                    if (strcmp(name, oper3) == 1) {memset(oper3, 0, sizeof(oper3));oper3[0] = variables[i].value.word; printf("[TRACE] Oper3 var is: %d", oper1[0]);}
-                }
-            }
+            
             if(trace) {
                 printf("[TRACE] Args read: %d\n", args_read);
                 printf("[TRACE] Command: '%s', Oper1: '%s', Oper2: '%s', Oper3: '%s'\n", 
@@ -874,8 +1012,12 @@ int main(int argc, char **argv) {
             if(trace) printf("[TRACE] Exiting compiler...\n");
             break;
         }
-        
-        if(strcmp(oper1, "=") == 0) { // если создаем переменную
+        else if(strcmp(xD_command, "compile") == 0) {
+            compile();
+            is_compile = true;
+            printf("Compilation complete. Output: test.bin\n");
+        }
+        else if(strcmp(oper1, "=") == 0) { // если создаем переменную
             if(trace) printf("[TRACE] Processing assignment operation\n");
             
             short index = find_variable(xD_command);
@@ -887,11 +1029,13 @@ int main(int argc, char **argv) {
             else { // создаем новую переменную
                 create_new_variable(xD_command, oper2);
             }
+            is_compile = false;
         } else if(if_system_command(xD_command) >= 0){
             int index = if_system_command(xD_command);
             systemcommands[index].function();
         } else if (strcmp(xD_command, "point") == 0){
             add_label(oper1, (code_compile_count));
+            is_compile = false;
         }
         else{
             for (int i = 0; i < (sizeof(commands)/sizeof(type_table_command));i++){
@@ -900,6 +1044,7 @@ int main(int argc, char **argv) {
                 }
             }
             add_command_for_compile(xD_command, oper1, oper2, oper3);
+            is_compile = false;
         }
         
         if(trace) printf("[TRACE] Data address count: %d, Labels count: %d, Code compile: %d, Code adress: %d\n", 
