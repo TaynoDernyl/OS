@@ -181,7 +181,7 @@ int string_to_int(const char* str);
 void int_to_string(int, char*);
 //функции для записи - чтения
 void read_swag(char* path);
-void in_bin(char* path);
+void in_bin(char* name_file);
 
 
 //прерывания ошибки
