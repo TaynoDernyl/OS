@@ -21,13 +21,15 @@ bool trace = false;
 
 bool checking_the_numbers = 1;
 
+int code_compiling_count = 0; //для компиляции, счетчик сколько комманд ввел пользователь
+
 int count_checking_the_numbers = 0;
 
 int labels_count = 0;
 
 int data_adress_count = 0;
 
-int code_adress_count = 0;
+int code_adress_count = 0; //сколько команд будет скомпилировано
 
 int var_count = 0;
 
@@ -139,7 +141,7 @@ type_table_command commands[] = {
     {"jnz", 0x0d, 2, compile_jnz},
     {"print", 0x0e, 0, compile_print},
     {"printstr", 0x10, 0, compile_printstr},
-    {"mov", 0x20, 2, compile_mov},
+    {"mov", 0x20, 3, compile_mov},
     {"input", 0xf9, 0, compile_input},
     {"stop", 0xff, 0, compile_stop},
     {"setv", 0x30, 3, compile_setv},
