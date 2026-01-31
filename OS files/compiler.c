@@ -21,10 +21,20 @@
 
 void load_file(char* filename) {
     if (trace) printf("[TRACE] Loading file: %s\n", filename);
+    
+    bool is_compile = true;
+    
+    // Проверяем расширение файла
+    char* ext = strrchr(filename, '.');
+    if(ext != NULL && (strcmp(ext, ".swg") == 0 || strcmp(ext, ".SWG") == 0)) {
+        // Это .swg файл
+    } else {
+        printf("Warning: %s doesn't have .swg extension, loading anyway...\n", filename);
+    }
 
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
-        error("Error: Cannot open file ");
+        printf("Error: Cannot open file %s\n", filename);
         return;
     }
 
@@ -32,13 +42,11 @@ void load_file(char* filename) {
     int line_num = 1;
 
     while (fgets(line, sizeof(line), file)) {
-        // Убираем символ новой строки
         size_t len = strlen(line);
         if (len > 0 && line[len - 1] == '\n') {
             line[len - 1] = '\0';
         }
 
-        // Пропускаем пустые строки и комментарии
         if (line[0] == '\0' || line[0] == ';' || line[0] == '#') {
             line_num++;
             continue;
@@ -46,50 +54,75 @@ void load_file(char* filename) {
 
         if (trace) printf("[TRACE] Line %d: %s\n", line_num, line);
 
-        // Разбираем строку на команду и операнды
         char xD_command[100] = {0};
         char oper1[32] = {NO_OPERAND};
         char oper2[32] = {NO_OPERAND};
         char oper3[32] = {NO_OPERAND};
 
         int args_read = sscanf(line, "%99s %31s %31s %31s", xD_command, oper1, oper2, oper3);
-
-        // Если это присваивание
-        if (strcmp(oper1, "=") == 0) {
-            if (trace) printf("[TRACE] Processing assignment: %s\n", xD_command);
-
+        
+        if(trace) {
+            printf("[TRACE] Args read: %d\n", args_read);
+            printf("[TRACE] Command: '%s', Oper1: '%s', Oper2: '%s', Oper3: '%s'\n", 
+                xD_command, oper1, oper2, oper3);
+        }
+        
+        if (args_read < 4) oper3[0] = NO_OPERAND;
+        if (args_read < 3) oper2[0] = NO_OPERAND;
+        if (args_read < 2) oper1[0] = NO_OPERAND;
+        if (args_read < 1) xD_command[0] = NO_OPERAND;
+        
+        if(strcmp(xD_command, "exit") == 0){
+            if(trace) printf("[TRACE] Exiting file processing...\n");
+            break;
+        }
+        else if(strcmp(xD_command, "compile") == 0) {
+            // В файле можно игнорировать compile или обработать позже
+            is_compile = true;
+            if (trace) printf("[TRACE] Found compile command in file\n");
+        }
+        else if(strcmp(oper1, "=") == 0) {
+            if(trace) printf("[TRACE] Processing assignment: %s = %s\n", xD_command, oper2);
+            
             short index = find_variable(xD_command);
+            if (trace) printf("[TRACE] Variable index: %d\n", index);
+            
             if (index >= 0) {
                 handle_existing_variable_assignment(xD_command, oper2, index);
             } else {
                 create_new_variable(xD_command, oper2);
             }
+            is_compile = false;
         }
-        // Системные команды
-        else if (if_system_command(xD_command) >= 0) {
+        else if(if_system_command(xD_command) >= 0) {
             int index = if_system_command(xD_command);
             systemcommands[index].function();
         }
-        // Метка
         else if (strcmp(xD_command, "point") == 0) {
             add_label(oper1, code_adress_count);
+            is_compile = false;
         }
-        // Обычные команды
         else if (strlen(xD_command) > 0) {
-            add_command_for_compile(xD_command, oper1, oper2, oper3); // добавляем команду
+            // Обработка обычных команд
+            for (int i = 0; i < (sizeof(commands)/sizeof(type_table_command)); i++) {
+                if (strcmp(commands[i].name, xD_command) == 0) {
+                    code_compile_count += (commands[i].args_count + 1);
+                    break;
+                }
+            }
+            add_command_for_compile(xD_command, oper1, oper2, oper3);
             if (trace) printf("[TRACE] Added command '%s' at index %d\n", xD_command, code_adress_count - 1);
+            is_compile = false;
         }
 
         line_num++;
+        
+        if(trace) printf("[TRACE] Data address: %d, Labels: %d, Code address: %d\n", 
+               data_adress_count, labels_count, code_adress_count);
     }
 
     fclose(file);
     printf("File %s loaded successfully (%d lines, %d commands)\n", filename, line_num - 1, code_adress_count);
-
-    if (trace) {
-        printf("[TRACE] Data address count: %d, Labels count: %d, Code address count: %d\n",
-               data_adress_count, labels_count, code_adress_count);
-    }
 }
 
 // ==================== РЕАЛИЗАЦИЯ БАЗОВЫХ ФУНКЦИЙ ====================
@@ -502,23 +535,23 @@ void first_pass(void) {
         char code_string[32]; // объявляем один раз в начале
 
         if (get_reg_code(commands_for_compile[i].oper1) >= 0 && get_reg_code(commands_for_compile[i].oper1) <= 10){
-            printf("[TRACE] Code oper 1 = %d\n", get_reg_code(commands_for_compile[i].oper1));
+            if (trace) printf("[TRACE] Code oper 1 = %d\n", get_reg_code(commands_for_compile[i].oper1));
             uint8_t code = get_reg_code(commands_for_compile[i].oper1); 
             memset(commands_for_compile[i].oper1, 0, sizeof(commands_for_compile[i].oper1));
             int_to_string(code, code_string);
             strcpy(commands_for_compile[i].oper1, code_string);
             memset(code_string, 0, 32);
         }
-        if (get_reg_code(commands_for_compile[i].oper2) >= 0 && get_reg_code(commands_for_compile[i].oper1) <= 10){
-            printf("[TRACE] Code oper 2 = %Xd\n", get_reg_code(commands_for_compile[i].oper2));
+        if (get_reg_code(commands_for_compile[i].oper2) >= 0 && get_reg_code(commands_for_compile[i].oper2) <= 10){
+            if (trace) printf("[TRACE] Code oper 2 = %Xd\n", get_reg_code(commands_for_compile[i].oper2));
             uint8_t code = get_reg_code(commands_for_compile[i].oper2); 
             memset(commands_for_compile[i].oper2, 0, sizeof(commands_for_compile[i].oper2));
             int_to_string(code, code_string); // Используем тот же массив
             strcpy(commands_for_compile[i].oper2, code_string);
             memset(code_string, 0, 32);
         }
-        if (get_reg_code(commands_for_compile[i].oper3) >= 0 && get_reg_code(commands_for_compile[i].oper1) <= 10){
-            printf("[TRACE] Code oper 3 = %d\n", get_reg_code(commands_for_compile[i].oper3));
+        if (get_reg_code(commands_for_compile[i].oper3) >= 0 && get_reg_code(commands_for_compile[i].oper2) <= 10){
+            if (trace) printf("[TRACE] Code oper 3 = %d\n", get_reg_code(commands_for_compile[i].oper3));
             uint8_t code = get_reg_code(commands_for_compile[i].oper3); 
             memset(commands_for_compile[i].oper3, 0, sizeof(commands_for_compile[i].oper3));
             int_to_string(code, code_string); // Используем тот же массив
