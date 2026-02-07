@@ -83,7 +83,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0x20, 0x00,0x00,0x00,0x20, 0xFF};
+    uint8_t demo[] = {0x00,0xC0,0x00,0x00,0x20,0x04,0x01,0x00,0x10,0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -274,6 +274,7 @@ int main(int argc, char **argv) {
                 uint8_t reg = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint16_t addr = rd16(&cpu);
                 cpu.PC += 2;
+                if(trace){printf("STORE in %d", addr);}
 
                 switch (reg) {
                     case REG_AL:
@@ -498,6 +499,18 @@ int main(int argc, char **argv) {
                 }
                 if (trace) printf("=== END PRINT_STR ===\n");
             } break;
+
+            case 0xC0: { //PUSH
+                uint8_t flag = mem[cpu.PC++ % MEM_SIZE + cpu.CS]; //8 or 16 bit (0 - 8 bit, 1 - 16 bit)
+                uint8_t IR = mem[cpu.PC++ % MEM_SIZE + cpu.CS]; //If Reg
+                uint8_t opL = mem[cpu.PC++ % MEM_SIZE + cpu.CS]; //data
+                if (flag == 0){
+                    if(IR == 0){
+                        mem[cpu.SP-- % MEM_SIZE] = opL;
+                    }
+                }
+            } break;
+
             case 0xD0: {
                 uint8_t op1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t op2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
