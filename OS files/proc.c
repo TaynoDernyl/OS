@@ -21,6 +21,7 @@
 #include "videocardemu.h"
 
 #define MEM_SIZE 65536
+#define version "0.0.7 NEW ERA"
 
 enum {
     REG_AL = 0,
@@ -33,14 +34,15 @@ enum {
     REG_CS = 7,
     REG_CX = 8,
     REG_PX = 9,
-    REG_PY = 10
+    REG_PY = 10,
+    REG_SP = 11
 };
 
 typedef struct 
 {
     uint8_t AL, AH, BL, BH, PX, PY;
     uint16_t AX, BX, DS, CS, CX;
-    uint16_t PC;
+    uint16_t PC, SP;
     uint8_t Z;
 } CPU;
 
@@ -81,13 +83,13 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0x32,0x09,0x03,0x32,0x30,1,1,0x20,0x30,1,2,0x20,0x30,1,3,0x20,0x30,1,4,0x20,0x30,1,5,0x20,0x30,2,5,0x20,0x30,3,5,0x20,0x30,5,1,0x40,0x30,6,1,0x40,0x30,7,1,0x40,0x30,8,1,0x40,0x30,5,2,0x40,0x30,5,3,0x40,0x30,6,3,0x40,0x30,7,3,0x40,0x30,5,4,0x40,0x30,5,5,0x40,0x30,6,5,0x40,0x30,7,5,0x40,0x30,8,5,0x40,0x30,10,1,0x60,0x30,11,1,0x60,0x30,12,1,0x60,0x30,11,2,0x60,0x30,11,3,0x60,0x30,11,4,0x60,0x30,11,5,0x60,0x30,14,2,0x80,0x30,15,2,0x80,0x30,16,2,0x80,0x30,14,3,0x80,0x30,16,3,0x80,0x30,14,4,0x80,0x30,15,4,0x80,0x30,16,4,0x80,0x30,18,2,0xA0,0x30,19,2,0xA0,0x30,20,2,0xA0,0x30,18,3,0xA0,0x30,18,4,0xA0,0x30,19,4,0xA0,0x30,20,4,0xA0,0x30,20,5,0xA0,0x31,0xF9,0xD0,0x00,0x71,0x0C,0xC0,0x32,0x31,0xF9,0xD0,0x00,0x71,0x0D,0x00,0x00,0xFF};
+    uint8_t demo[] = {0x20, 0x00,0x00,0x00,0x20, 0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
 
 int main(int argc, char **argv) {
-    printf("Welcome to Letos 0.0.3!\n");
+    printf("Welcome to Letos %s!\n", version);
     int trace = 0;
     const char *prog = NULL;
     for (int i = 1; i < argc; ++i) {
@@ -97,13 +99,13 @@ int main(int argc, char **argv) {
 
     if (prog) load_binary(prog); else load_demo_program();
 
-    CPU cpu = {.PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0, .BH = 0, .AX = 0, .BX = 0, .DS = 0x1000, .CS = 0, .CX = 0, .PX = 0, .PY = 0};
+    CPU cpu = {.PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0, .BH = 0, .AX = 0, .BX = 0, .DS = 0x1000, .CS = 0, .CX = 0, .PX = 0, .PY = 0, .SP = 0x2000};
 
     for (;;) {
         uint8_t op = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
         if (trace) {
-            printf("\n PC=%04u OP=%02X Z=%02d AL=%02u AH=%02u BL=%02u BH=%02u AX=%04u BX=%04u DS=%04u CS=%04u CX=%04u PX=%02u PY=%02u\n",
-                (cpu.PC-1 + cpu.CS) & 0xFFFF, op, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH, cpu.AX, cpu.BX, cpu.DS, cpu.CS, cpu.CX, cpu.PX, cpu.PY);
+            printf("\n PC=%04u OP=%02X Z=%02d AL=%02u AH=%02u BL=%02u BH=%02u AX=%04u BX=%04u DS=%04u CS=%04u CX=%04u PX=%02u PY=%02u, Stack=%04u\n",
+                (cpu.PC-1 + cpu.CS) & 0xFFFF, op, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH, cpu.AX, cpu.BX, cpu.DS, cpu.CS, cpu.CX, cpu.PX, cpu.PY, cpu.SP);
         }
         
         switch (op) {
@@ -139,20 +141,24 @@ int main(int argc, char **argv) {
             
             case 0x20: {
                 uint8_t flags = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                uint8_t IR = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t dst = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t src = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
 
                 if (flags == 0) {
                     uint8_t val = 0;
-                    switch (src) {
-                        case REG_AL: val = cpu.AL; break;
-                        case REG_AH: val = cpu.AH; break;
-                        case REG_BL: val = cpu.BL; break;
-                        case REG_BH: val = cpu.BH; break;
-                        case REG_PX: val = cpu.PX; break;
-                        case REG_PY: val = cpu.PY; break;
-                        default: val = src; break;
-                    }
+                    if (IR == 1){
+                        switch (src) {
+                            case REG_AL: val = cpu.AL; break;
+                            case REG_AH: val = cpu.AH; break;
+                            case REG_BL: val = cpu.BL; break;
+                            case REG_BH: val = cpu.BH; break;
+                            case REG_PX: val = cpu.PX; break;
+                            case REG_PY: val = cpu.PY; break;
+                        }
+                    } else if(IR == 0){
+                        val = src;
+                    }    
                     switch (dst) {
                         case REG_AL: cpu.AL = val; sync_ax_from_al_ah(&cpu); break;
                         case REG_AH: cpu.AH = val; sync_ax_from_al_ah(&cpu); break;
@@ -166,14 +172,18 @@ int main(int argc, char **argv) {
                 } else if (flags == 1) {
                     uint16_t val = 0;
                     uint8_t src2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
-                    switch (src) {
-                        case REG_AX: val = cpu.AX; break;
-                        case REG_BX: val = cpu.BX; break;
-                        case REG_CX: val = cpu.CX; break;
-                        case REG_DS: val = cpu.DS; break;
-                        case REG_CS: val = cpu.CS; break;
-                        default: val = (src << 8) | src2; break;
+                    if(IR == 1){
+                        switch (src) {
+                            case REG_AX: val = cpu.AX; break;
+                            case REG_BX: val = cpu.BX; break;
+                            case REG_CX: val = cpu.CX; break;
+                            case REG_DS: val = cpu.DS; break;
+                            case REG_CS: val = cpu.CS; break;
+                        }
                     }
+                    else if(IR == 0){
+                        val = (src << 8) | src2;
+                    }   
                     switch (dst) {
                         case REG_AX: cpu.AX = val; sync_al_ah_from_ax(&cpu); break;
                         case REG_BX: cpu.BX = val; sync_bl_bh_from_bx(&cpu); break;
@@ -311,22 +321,28 @@ int main(int argc, char **argv) {
             } break;
 
             case 0x07: {
+                uint8_t IR = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t oper1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t oper2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint16_t val = 0;
                 int valid = 1;
 
-                switch (oper2){
-                    case REG_AL: val = cpu.AL; break;
-                    case REG_AH: val = cpu.AH; break;
-                    case REG_BL: val = cpu.BL; break;
-                    case REG_BH: val = cpu.BH; break;
-                    case REG_PX: val = cpu.PX; break;
-                    case REG_PY: val = cpu.PY; break;
-                    case REG_AX: val = cpu.AX; break;
-                    case REG_BX: val = cpu.BX; break;
-                    case REG_CX: val = cpu.CX; break;
-                    default: val = oper2; break;
+                if (IR == 1){
+                    switch (oper2){
+                        case REG_AL: val = cpu.AL; break;
+                        case REG_AH: val = cpu.AH; break;
+                        case REG_BL: val = cpu.BL; break;
+                        case REG_BH: val = cpu.BH; break;
+                        case REG_PX: val = cpu.PX; break;
+                        case REG_PY: val = cpu.PY; break;
+                        case REG_AX: val = cpu.AX; break;
+                        case REG_BX: val = cpu.BX; break;
+                        case REG_CX: val = cpu.CX; break;
+                        default: val = oper2; break;
+                    }
+                }
+                else if(IR == 0){
+                    val = oper2;
                 }
 
                 if ((oper1 <= REG_PY) && (val > 255)) {
@@ -351,22 +367,27 @@ int main(int argc, char **argv) {
             } break;
 
             case 0x08: {
+                uint8_t IR = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t oper1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t oper2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint16_t val = 0;
                 int valid = 1;
-
-                switch (oper2){
-                    case REG_AL: val = cpu.AL; break;
-                    case REG_AH: val = cpu.AH; break;
-                    case REG_BL: val = cpu.BL; break;
-                    case REG_BH: val = cpu.BH; break;
-                    case REG_PX: val = cpu.PX; break;
-                    case REG_PY: val = cpu.PY; break;
-                    case REG_AX: val = cpu.AX; break;
-                    case REG_BX: val = cpu.BX; break;
-                    case REG_CX: val = cpu.CX; break;
-                    default: val = oper2; break;
+                if (IR == 1){
+                    switch (oper2){
+                        case REG_AL: val = cpu.AL; break;
+                        case REG_AH: val = cpu.AH; break;
+                        case REG_BL: val = cpu.BL; break;
+                        case REG_BH: val = cpu.BH; break;
+                        case REG_PX: val = cpu.PX; break;
+                        case REG_PY: val = cpu.PY; break;
+                        case REG_AX: val = cpu.AX; break;
+                        case REG_BX: val = cpu.BX; break;
+                        case REG_CX: val = cpu.CX; break;
+                        default: val = oper2; break;
+                    }
+                }
+                else if(IR == 0){
+                    val = oper2;
                 }
 
                 if ((oper1 <= REG_PY) && (val > 255)) {
@@ -477,7 +498,6 @@ int main(int argc, char **argv) {
                 }
                 if (trace) printf("=== END PRINT_STR ===\n");
             } break;
-            
             case 0xD0: {
                 uint8_t op1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t op2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
