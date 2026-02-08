@@ -83,7 +83,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0x00,0xC0,0x00,0x00,0x20,0x04,0x01,0x00,0x10,0xFF};
+    uint8_t demo[] = {0x20,0x00,0x00,0x00,0x20,0xC0,0x00,0x01,0x00,0x04,0x01,0x00,0x10,0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -500,16 +500,87 @@ int main(int argc, char **argv) {
                 if (trace) printf("=== END PRINT_STR ===\n");
             } break;
 
-            case 0xC0: { //PUSH
-                uint8_t flag = mem[cpu.PC++ % MEM_SIZE + cpu.CS]; //8 or 16 bit (0 - 8 bit, 1 - 16 bit)
-                uint8_t IR = mem[cpu.PC++ % MEM_SIZE + cpu.CS]; //If Reg
-                uint8_t opL = mem[cpu.PC++ % MEM_SIZE + cpu.CS]; //data
-                if (flag == 0){
-                    if(IR == 0){
+            case 0xC0: { // PUSH
+                uint8_t flag = mem[(cpu.CS + cpu.PC++) % MEM_SIZE];
+                uint8_t IR   = mem[(cpu.CS + cpu.PC++) % MEM_SIZE];
+                uint8_t opL  = mem[(cpu.CS + cpu.PC++) % MEM_SIZE];
+
+                if (flag == 0) {
+                    if (IR == 0) {
                         mem[cpu.SP-- % MEM_SIZE] = opL;
+                    } else {
+                        switch (opL) {
+                            case REG_AH:
+                                mem[cpu.SP-- % MEM_SIZE] = cpu.AH;
+                                break;
+                            case REG_AL:
+                                mem[cpu.SP-- % MEM_SIZE] = cpu.AL;
+                                break;
+                            case REG_BH:
+                                mem[cpu.SP-- % MEM_SIZE] = cpu.BH;
+                                break;
+                            case REG_BL:
+                                mem[cpu.SP-- % MEM_SIZE] = cpu.BL;
+                                break;
+                            case REG_PX:
+                                mem[cpu.SP-- % MEM_SIZE] = cpu.PX;
+                                break;
+                            case REG_PY:
+                                mem[cpu.SP-- % MEM_SIZE] = cpu.PY;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                } else {
+                    if (IR == 0) {
+                        uint8_t opH = mem[(cpu.CS + cpu.PC++) % MEM_SIZE];
+                        mem[cpu.SP-- % MEM_SIZE] = opH;
+                        mem[cpu.SP-- % MEM_SIZE] = opL;
+                    } else {
+                        switch (opL) {
+                            case REG_AX: {
+                                uint8_t low  = cpu.AX & 0xFF;
+                                uint8_t high = cpu.AX >> 8;
+                                mem[cpu.SP-- % MEM_SIZE] = high;
+                                mem[cpu.SP-- % MEM_SIZE] = low;
+                                break;
+                            }
+                            case REG_BX: {
+                                uint8_t low  = cpu.BX & 0xFF;
+                                uint8_t high = cpu.BX >> 8;
+                                mem[cpu.SP-- % MEM_SIZE] = high;
+                                mem[cpu.SP-- % MEM_SIZE] = low;
+                                break;
+                            }
+                            case REG_DS: {
+                                uint8_t low  = cpu.DS & 0xFF;
+                                uint8_t high = cpu.DS >> 8;
+                                mem[cpu.SP-- % MEM_SIZE] = high;
+                                mem[cpu.SP-- % MEM_SIZE] = low;
+                                break;
+                            }
+                            case REG_CS: {
+                                uint8_t low  = cpu.CS & 0xFF;
+                                uint8_t high = cpu.CS >> 8;
+                                mem[cpu.SP-- % MEM_SIZE] = high;
+                                mem[cpu.SP-- % MEM_SIZE] = low;
+                                break;
+                            }
+                            case REG_SP: {
+                                uint8_t low  = cpu.SP & 0xFF;
+                                uint8_t high = cpu.SP >> 8;
+                                mem[cpu.SP-- % MEM_SIZE] = high;
+                                mem[cpu.SP-- % MEM_SIZE] = low;
+                                break;
+                            }
+                            default:
+                                break;
+                        }
                     }
                 }
             } break;
+
 
             case 0xD0: {
                 uint8_t op1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
