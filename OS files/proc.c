@@ -35,7 +35,8 @@ enum {
     REG_CX = 8,
     REG_PX = 9,
     REG_PY = 10,
-    REG_SP = 11
+    REG_SP = 11,
+    REG_PC = 255
 };
 
 typedef struct 
@@ -83,7 +84,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0x20,0x00,0x00,0x00,0x20,0xC0,0x00,0x01,0x00,0x04,0x01,0x00,0x10,0xFF};
+    uint8_t demo[] = {0x20,0x01,0x00,0x04,0x00,0x10,0xC0,0x01,0x01,0x04,0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -168,10 +169,9 @@ int main(int argc, char **argv) {
                         case REG_PY: cpu.PY = val; break;
                         default: fprintf(stderr, "Invalid 8-bit dst reg %u\n", dst); break;
                     }
-                    if (trace) printf("MOV flags=%u dst=%u src=%u\n", flags, dst, src);
+                    if (trace) printf("MOV flags=%u IR=%d dst=%u src=%u\n", flags, IR, dst, src);
                 } else if (flags == 1) {
                     uint16_t val = 0;
-                    uint8_t src2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                     if(IR == 1){
                         switch (src) {
                             case REG_AX: val = cpu.AX; break;
@@ -182,7 +182,9 @@ int main(int argc, char **argv) {
                         }
                     }
                     else if(IR == 0){
-                        val = (src << 8) | src2;
+                        uint8_t src2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                        val = (val & 0xFF00) | src;
+                        val = (val & 0x00FF) | ((uint16_t)src2 << 8);
                     }   
                     switch (dst) {
                         case REG_AX: cpu.AX = val; sync_al_ah_from_ax(&cpu); break;
@@ -192,7 +194,7 @@ int main(int argc, char **argv) {
                         case REG_CS: cpu.CS = val; break;
                         default: fprintf(stderr, "Invalid 16-bit dst reg %u\n", dst); break;
                     }
-                    if (trace) printf("MOV flags=%u dst=%u src=%04u\n", flags, dst, val);
+                    if (trace) printf("MOV flags=%u IR=%d dst=%u src=%04u\n", flags, IR, dst, val);
                 }
             } break;
 
@@ -532,6 +534,7 @@ int main(int argc, char **argv) {
                                 break;
                         }
                     }
+                    if(trace){printf("PUSH - %d", mem[(cpu.SP + 1) % MEM_SIZE]);}
                 } else {
                     if (IR == 0) {
                         uint8_t opH = mem[(cpu.CS + cpu.PC++) % MEM_SIZE];
@@ -549,6 +552,13 @@ int main(int argc, char **argv) {
                             case REG_BX: {
                                 uint8_t low  = cpu.BX & 0xFF;
                                 uint8_t high = cpu.BX >> 8;
+                                mem[cpu.SP-- % MEM_SIZE] = high;
+                                mem[cpu.SP-- % MEM_SIZE] = low;
+                                break;
+                            }
+                            case REG_CX: {
+                                uint8_t low  = cpu.CX & 0xFF;
+                                uint8_t high = cpu.CX >> 8;
                                 mem[cpu.SP-- % MEM_SIZE] = high;
                                 mem[cpu.SP-- % MEM_SIZE] = low;
                                 break;
@@ -574,15 +584,26 @@ int main(int argc, char **argv) {
                                 mem[cpu.SP-- % MEM_SIZE] = low;
                                 break;
                             }
+                            case REG_PC: {
+                                uint8_t low  = cpu.PC & 0xFF;
+                                uint8_t high = cpu.PC >> 8;
+                                mem[cpu.SP-- % MEM_SIZE] = high;
+                                mem[cpu.SP-- % MEM_SIZE] = low;
+                                break;
+                            }
                             default:
                                 break;
                         }
                     }
+                    uint16_t final_number = (final_number & 0x00FF) | ((uint16_t)mem[(cpu.SP + 2) % MEM_SIZE] << 8);
+                    final_number = (final_number & 0xFF00) | mem[(cpu.SP + 1) % MEM_SIZE];
+                    if(trace){printf("PUSH lowbyte- %d, highbyte- %d, final number- %d", mem[(cpu.SP + 1) % MEM_SIZE], mem[(cpu.SP + 2) % MEM_SIZE], final_number);}
                 }
             } break;
 
 
             case 0xD0: {
+                uint8_t IR = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t op1 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint8_t op2 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
                 uint16_t val1 = 0, val2 = 0;
@@ -599,20 +620,25 @@ int main(int argc, char **argv) {
                     case REG_CX: val1 = cpu.CX; break;
                     default: val1 = op1; break;
                 }
-
-                switch (op2) {
-                    case REG_AL: val2 = cpu.AL; break;
-                    case REG_AH: val2 = cpu.AH; break;
-                    case REG_BL: val2 = cpu.BL; break;
-                    case REG_BH: val2 = cpu.BH; break;
-                    case REG_PX: val2 = cpu.PX; break;
-                    case REG_PY: val2 = cpu.PY; break;
-                    case REG_AX: val2 = cpu.AX; break;
-                    case REG_BX: val2 = cpu.BX; break;
-                    case REG_CX: val2 = cpu.CX; break;
-                    default: val2 = op2; break;
+                if (IR == 1){
+                    switch (op2) {
+                        case REG_AL: val2 = cpu.AL; break;
+                        case REG_AH: val2 = cpu.AH; break;
+                        case REG_BL: val2 = cpu.BL; break;
+                        case REG_BH: val2 = cpu.BH; break;
+                        case REG_PX: val2 = cpu.PX; break;
+                        case REG_PY: val2 = cpu.PY; break;
+                        case REG_AX: val2 = cpu.AX; break;
+                        case REG_BX: val2 = cpu.BX; break;
+                        case REG_CX: val2 = cpu.CX; break;
+                        default: val2 = op2; break;
+                    }
                 }
-
+                else if(IR == 0){
+                    uint8_t op3 = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
+                    val2 = (val2 & 0x00FF) | ((uint16_t)op3 << 8);
+                    val2 = (val2 & 0xFF00) | op2;
+                }
                 cpu.Z = (val1 == val2);
 
                 if (trace) {
