@@ -36,14 +36,15 @@ enum {
     REG_PX = 9,
     REG_PY = 10,
     REG_SP = 11,
+    REG_RT = 12,
     REG_PC = 255
 };
 
 typedef struct 
 {
     uint8_t AL, AH, BL, BH, PX, PY;
-    uint16_t AX, BX, DS, CS, CX;
-    uint16_t PC, SP;
+    uint16_t AX, BX, CX;
+    uint16_t PC, SP, DS, CS, RT;
     uint8_t Z;
 } CPU;
 
@@ -84,7 +85,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0x20,0x01,0x00,0x04,0x00,0x10,0xC0,0x01,0x01,0x04,0xFF};
+    uint8_t demo[] = {0xC0,0x01,0x00,0x10,0x10,0xC1,0x00,0x00,0xC1,0x00,0x01,0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -100,13 +101,14 @@ int main(int argc, char **argv) {
 
     if (prog) load_binary(prog); else load_demo_program();
 
-    CPU cpu = {.PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0, .BH = 0, .AX = 0, .BX = 0, .DS = 0x1000, .CS = 0, .CX = 0, .PX = 0, .PY = 0, .SP = 0x2000};
+    CPU cpu = {.PC = 0, .Z = 0, .AL = 0, .AH = 0, .BL =0,
+.BH = 0, .AX = 0, .BX = 0, .DS = 0x1000, .CS = 0, .CX = 0, .PX = 0, .PY = 0, .SP = 0x2000, .RT = 0};
 
     for (;;) {
         uint8_t op = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
         if (trace) {
-            printf("\n PC=%04u OP=%02X Z=%02d AL=%02u AH=%02u BL=%02u BH=%02u AX=%04u BX=%04u DS=%04u CS=%04u CX=%04u PX=%02u PY=%02u, Stack=%04u\n",
-                (cpu.PC-1 + cpu.CS) & 0xFFFF, op, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH, cpu.AX, cpu.BX, cpu.DS, cpu.CS, cpu.CX, cpu.PX, cpu.PY, cpu.SP);
+            printf("\n PC=%04u OP=%02X Z=%02d AL=%02u AH=%02u BL=%02u BH=%02u AX=%04u BX=%04u DS=%04u CS=%04u CX=%04u PX=%02u PY=%02u, Stack=%04u, Return = %04u\n",
+                (cpu.PC-1 + cpu.CS) & 0xFFFF, op, cpu.Z, cpu.AL, cpu.AH, cpu.BL, cpu.BH, cpu.AX, cpu.BX, cpu.DS, cpu.CS, cpu.CX, cpu.PX, cpu.PY, cpu.SP, cpu.RT);
         }
         
         switch (op) {
@@ -601,6 +603,72 @@ int main(int argc, char **argv) {
                 }
             } break;
 
+            case 0xC1: { //POP
+                uint8_t flag = mem[(cpu.CS + cpu.PC++) % MEM_SIZE];
+                uint8_t reg = mem[(cpu.CS + cpu.PC++) % MEM_SIZE];
+                if (flag == 1){ //16 bit
+                    uint8_t op1 = mem[++cpu.SP % MEM_SIZE];
+                    uint8_t op2 = mem[++cpu.SP % MEM_SIZE];
+                    uint16_t val = (uint16_t)op2 | ((uint16_t)op1 << 8);
+                    switch (reg)
+                    {
+                    case REG_AX:
+                        cpu.AX = val;
+                        sync_al_ah_from_ax(&cpu);
+                        break;
+                    case REG_BX:
+                        cpu.BX = val;
+                        sync_bl_bh_from_bx(&cpu);
+                        break;
+                    case REG_CX:
+                        printf("in CX only numbers, no reg & adres");
+                        break;
+                    case REG_DS:
+                        cpu.DS = val;
+                        break;
+                    case REG_CS:
+                        cpu.CS = val;
+                        break;
+                    case REG_SP:
+                        cpu.SP = val;
+                        break;
+                    default:
+                        if(trace) {printf("no such 16 bit regs");}
+                        break;
+                    }
+                } 
+                else if(flag == 0){ //8 bit
+                    uint8_t op = mem[++cpu.SP % MEM_SIZE];
+                    switch (reg)
+                    {
+                    case REG_AL:
+                        cpu.AL = op;
+                        sync_ax_from_al_ah(&cpu);
+                        break;
+                    case REG_AH:
+                        cpu.AH = op;
+                        sync_ax_from_al_ah(&cpu);
+                        break;
+                    case REG_BL:
+                        cpu.BL = op;
+                        sync_bx_from_bl_bh(&cpu);
+                        break;
+                    case REG_BH:
+                        cpu.BH = op;
+                        sync_bx_from_bl_bh(&cpu);
+                        break;
+                    case REG_PX:
+                        cpu.PX = op;
+                        break;
+                    case REG_PY:
+                        cpu.PY = op;
+                        break;
+                    default:
+                        if(trace) {printf("no such 8 bit reg");}
+                        break;
+                    }
+                }
+            } break;
 
             case 0xD0: {
                 uint8_t IR = mem[cpu.PC++ % MEM_SIZE + cpu.CS];
