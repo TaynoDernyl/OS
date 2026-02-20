@@ -85,7 +85,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0xC0,0x01,0x00,0x10,0x10,0xC1,0x00,0x00,0xC1,0x00,0x01,0xFF};
+    uint8_t demo[] = {0xC1, 0x00, 0x00,0x07,0x00,REG_SP, 0x01,0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -181,6 +181,8 @@ int main(int argc, char **argv) {
                             case REG_CX: val = cpu.CX; break;
                             case REG_DS: val = cpu.DS; break;
                             case REG_CS: val = cpu.CS; break;
+                            case REG_SP: val = cpu.SP; break;
+                            case REG_RT: val = cpu.RT; break;
                         }
                     }
                     else if(IR == 0){
@@ -194,6 +196,8 @@ int main(int argc, char **argv) {
                         case REG_CX: cpu.CX = val; break;
                         case REG_DS: cpu.DS = val; break;
                         case REG_CS: cpu.CS = val; break;
+                        case REG_SP: cpu.SP = val; break;
+                        case REG_RT: cpu.RT = val; break;
                         default: fprintf(stderr, "Invalid 16-bit dst reg %u\n", dst); break;
                     }
                     if (trace) printf("MOV flags=%u IR=%d dst=%u src=%04u\n", flags, IR, dst, val);
@@ -268,6 +272,16 @@ int main(int argc, char **argv) {
                         cpu.PY = mem[addr % MEM_SIZE + cpu.DS];
                         setZ8(&cpu, cpu.PY);
                         break;
+                    case REG_RT: {
+                        uint8_t lo = mem[addr % MEM_SIZE + cpu.DS];
+                        uint8_t hi = mem[(addr + 1) % MEM_SIZE + cpu.DS];
+                        cpu.RT = (hi << 8) | lo;
+                    }break;
+                    case REG_SP: {
+                        uint8_t lo = mem[addr % MEM_SIZE + cpu.DS];
+                        uint8_t hi = mem[(addr + 1) % MEM_SIZE + cpu.DS];
+                        cpu.SP = (hi << 8) | lo;
+                    }break;
                     default:
                         fprintf(stderr, "Invalid reg %u in LOAD\n", reg);
                         break;
@@ -319,6 +333,14 @@ int main(int argc, char **argv) {
                     case REG_PY:
                         mem[addr % MEM_SIZE + cpu.DS] = cpu.PY;
                         break;      
+                    case REG_RT:
+                        mem[addr % MEM_SIZE + cpu.DS] = cpu.RT & 0xFF;
+                        mem[(addr + 1) % MEM_SIZE + cpu.DS] = (cpu.RT >> 8) & 0xFF;
+                        break;  
+                    case REG_SP:
+                        mem[addr % MEM_SIZE + cpu.DS] = cpu.SP & 0xFF;
+                        mem[(addr + 1) % MEM_SIZE + cpu.DS] = (cpu.SP >> 8) & 0xFF;
+                        break;      
                     default:
                         mem[addr % MEM_SIZE + cpu.DS] = reg;
                         break;
@@ -343,6 +365,8 @@ int main(int argc, char **argv) {
                         case REG_AX: val = cpu.AX; break;
                         case REG_BX: val = cpu.BX; break;
                         case REG_CX: val = cpu.CX; break;
+                        case REG_RT: val = cpu.RT; break;
+                        case REG_SP: val = cpu.SP; break;
                         default: val = oper2; break;
                     }
                 }
@@ -366,6 +390,8 @@ int main(int argc, char **argv) {
                         case REG_AX: cpu.AX -= val; setZ16(&cpu, cpu.AX); sync_al_ah_from_ax(&cpu); break;       
                         case REG_BX: cpu.BX -= val; setZ16(&cpu, cpu.BX); sync_bl_bh_from_bx(&cpu); break;    
                         case REG_CX: cpu.CX -= val; setZ16(&cpu, cpu.CX); break;
+                        case REG_RT: cpu.RT -= val; break;
+                        case REG_SP: cpu.SP -= val; setZ16(&cpu, (cpu.SP - 8192));break;
                         default: printf("invalid reg"); break;
                     }
                 }
