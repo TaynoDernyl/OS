@@ -65,15 +65,37 @@ Register registers[] = {
 };
 
 typedef struct {
-
-    char* name;
-    uint8_t opcode;
-    bool if_flag;
-    bool if_IR;
-    uint8_t opperands; //=======================================================ДОДЕЛАТЬ!!!!!!!
-
+    const char* name;     // название команды
+    uint8_t opcode;       // код
+    bool if_flag;         // есть ли флаги 16/8 bit
+    bool if_IR;           // есть ли IR флаг
+    uint8_t min_bytes;    // минимум байтов после флагов
+    uint8_t max_bytes;    // максимум байтов после флагов
 } Command;
 
+Command commands[] = {
+    {"NOP",   0x00, false, false, 0, 0},
+    {"load",  0x04, false, false, 2, 2}, 
+    {"store", 0x05, false, false, 2, 2}, 
+    {"sub",   0x07, false, true,  2, 2}, 
+    {"add",   0x08, false, true,  2, 2}, 
+    {"inc",   0x09, false, false, 1, 1},
+    {"dec",   0x0A, false, false, 1, 1},
+    {"jump",  0x0B, false, false, 2, 2},
+    {"jz",    0x0C, false, false, 2, 2},
+    {"jnz",   0x0D, false, false, 2, 2},
+    {"print", 0x0E, false, false, 0, 0},
+    {"print_string", 0x10, false, false, 0, 0},
+    {"mov",   0x20, true,  true,  2, 3},
+    {"set_pixel", 0x30, false, false, 3, 3},
+    {"render",0x31, false, false, 0, 0},
+    {"init",  0x32, false, false, 0, 0},
+    {"comp",  0xD0, false, true, 2, 2},
+    {"<",     0xD1, false, true, 2, 2},
+    {">",     0xD2, false, true, 2, 2},
+    {"input", 0xF9, false, false, 0, 0},
+    {"stop",  0xFF, false, false, 0, 0}
+};
 
 bool trace = false; //трассировка
 const char* code = NULL; //определение места под нашу программу
