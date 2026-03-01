@@ -101,6 +101,11 @@ bool trace = false; //трассировка
 const char* code = NULL; //определение места под нашу программу
 bool save = false; //***-если не сохранено, ===-если сохранено
 
+void error(char* arg, int* y){
+    printf("You have a error:%s in %u line, exit from compile", arg, *y);
+    exit(0);
+}
+
 static void load_code_from_input_file(char *name){
     FILE *file = fopen(name, "r");
     if (!file) {perror("fopen"); exit(1);}
@@ -117,24 +122,35 @@ void clear_screen() {
 
 void parser_stroke(char *stroke, int *x, int *y){ //разбираем строку на слова с разделителем '|'
     for(int i = 0; i <= 30; ++i){
-        int symb = getchar(); 
-        *x += 1;
-        bool exit = false;
+        int symb = getch(); 
+        *x += 1; //увеличиваем координату х
+        
+        bool exit = false; //используем чтобы выйти из цикла если true
+
         switch(symb){
-            case '\n':
+
+            case '\r':
+                printf("\n");
                 exit = true;
                 break;
+
             case 24:
                 exit = true;
                 strcpy(stroke, "");
                 if(trace)printf("[TRACE] Exit & clear buffer\n");
                 break;
         }
+
         if (exit == false){
-            if(symb == ' '){stroke[i] = '|';}
-            else{
+            printf("%c", symb);
+            if(symb == ' ')
+            {
+                stroke[i] = '|';
+            }
+            else
+            {
                 stroke[i] = symb;
-                }
+            }
             if (trace){printf("[TRACE] %c, number = %u\n", stroke[i], i);}
         } else{
             break;
@@ -151,12 +167,15 @@ bool parser_words(char *words){
 
 int main(int argc, char **argv)
 {
+    clear_screen();
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--trace") == 0) trace = 1; //включена ли трассировка
         else code = argv[i]; //есть ли файл при запуске
     }
     if (trace){printf("Hi, this is LETOS compiler, version %s\n", version);}
+
     if (true){
+        
         int x = 0; //координата наших строк, позволяет удалить либо поменять определенную строку
         int y = 0;
         
@@ -172,13 +191,10 @@ int main(int argc, char **argv)
 
             char command[30] = {0};
             parser_stroke(command, &x, &y); //парсим строку
-            x--;
-            printf("\033[1A");
-            printf("\t\t\t\t\t\t (%u;%u)\n", x, y);
             if(!strcmp(command, "exit")) exit(0);
-            parser_words(command); //проверяем и подставляем значения
+            x--;
             y++;
-            //parser
+            parser_words(command); //проверяем и подставляем значения
         }
     }
 }
