@@ -134,30 +134,67 @@ void parser_stroke(char *stroke, int *x, int *y){ //разбираем стро�
                 exit = true;
                 break;
 
+            case 8:
+                if(i != 0){
+                    i-=2; //убираем индекс последнего символа
+                }
+                break;
+
             case 24:
                 exit = true;
                 strcpy(stroke, "");
                 if(trace)printf("[TRACE] Exit & clear buffer\n");
                 break;
+            
+            case 224:
+                symb = getch();
+                break;
         }
 
         if (exit == false){
-            printf("%c", symb);
-            if(symb == ' ')
+            
+            switch (symb)
             {
-                stroke[i] = '|';
+                case ' ':
+                    printf("%c", symb);
+                    stroke[i] = '|'; // заменяем пробел на '|'
+                    break;
+
+                case '\b': 
+                    printf("%c", symb);
+                    printf(" ");
+                    printf("%c", symb); // стираем последний символ
+                    stroke[i + 1] = '\0'; // устанавливаем ноль вместо старого символа
+                    break;
+                
+                case 77:
+                    printf("\033[C");
+                    break;
+
+                case 75:
+                    if (i != 0){
+                        printf("\b");
+                        i-=2;
+                    }
+                    break;
+
+                default:
+                    if (symb>31 & symb <126){
+                        printf("%c", symb);
+                        stroke[i] = symb; //если не подходит под исключения то вставляем символ по индексу в строку command в main функции
+                        
+                    }
+                    else{
+                        i--;
+                    }
+                    break;
             }
-            else
-            {
-                stroke[i] = symb;
-            }
+
             if (trace){printf("[TRACE] %c, number = %u\n", stroke[i], i);}
         } else{
             break;
         }
-
     }
-    
     return;
 }
 
@@ -190,10 +227,14 @@ int main(int argc, char **argv)
             }
 
             char command[30] = {0};
+
             parser_stroke(command, &x, &y); //парсим строку
             if(!strcmp(command, "exit")) exit(0);
+            printf("%s\n", command);
+
             x--;
             y++;
+
             parser_words(command); //проверяем и подставляем значения
         }
     }
