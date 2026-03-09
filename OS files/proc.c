@@ -85,7 +85,7 @@ static void load_binary(const char *path){
 }
 
 static void load_demo_program(void){
-    uint8_t demo[] = {0xC1, 0x00, 0x00,0x07,0x00,REG_SP, 0x01,0xFF};
+    uint8_t demo[] = {0x20,0x00,0x00,0x00,0x21,0x0E,0xFF};
     memset(mem, 0, MEM_SIZE);
     memcpy(mem, demo, sizeof(demo));
 }
@@ -492,7 +492,7 @@ int main(int argc, char **argv) {
             } break;
 
             case 0x0E:
-                printf("%c", cpu.AL);
+                putchar(cpu.AL);
                 break;
                 
             case 0x10: {
