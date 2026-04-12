@@ -21,8 +21,8 @@
 #include <stdint.h> //для регистров (uint8_t и т.д.)
 #include <stdbool.h> //для операций над false & true
 #include <stdlib.h> //для системных функций
-#include <conio.h> //для консоли
 #include "assembler.h" //ассемблер
+
 //================================Структуры======================================
 bool trace = false; //трассировка
 
@@ -89,16 +89,21 @@ Command commands[] = {
 //================================Функции========================================
 
 void error(char* arg, int y){
-    printf("You have an error:%s in %i line, exit from compile", arg, y);
+    printf("You have an error:%s in %i line, exit from compile\n", arg, y);
     exit(0);
 }
 
-static void load_code_from_input_file(FILE *file, Preprocessing_assembly *assembly){
-    char magic_bytes[8]; //+1 для нуль терминатора
+void init_assembler(Preprocessing_assembly* assembly){
+    assembly->macros_count = 0;
+    assembly->symbols_count = 0;
+    assembly->file = NULL; 
+}
 
-    if (!file) {perror("fopen"); exit(1);}
+static void load_code_from_input_file(char* name_file, Preprocessing_assembly *assembly){
+    char magic_bytes[8]; //+1 для нуль терминатора
+    FILE *file = fopen(name_file, "r+");
+    if (!file) {error("No such file", -1); exit(1);}
     fread(magic_bytes, 1, 7, file);
-    magic_bytes[7] = '\0';
     
     if(strcmp(magic_bytes, "@LET 1 ") == 0){ //если magic bytes совпадают
         assembly->file=file; //в тело ассемблера вставляем исходный файл
@@ -106,7 +111,7 @@ static void load_code_from_input_file(FILE *file, Preprocessing_assembly *assemb
         return;
     }
     else{
-        error("incorrect magic bytes", -1);
+        error("Incorrect magic bytes", -1);
     }
 }
 
@@ -118,7 +123,7 @@ void clear_screen() {
     #endif
 }
 
-void parser_stroke(char *stroke){ //разбираем строку на слова с разделителем '|'
+void parser_stroke(char *stroke){ 
     for(short i = 0; i<31; i++){
         if(stroke[i] == ' '){
             
@@ -133,13 +138,47 @@ int parser_words(char *words){
 int main(int argc, char **argv)
 {
     clear_screen();
-    Preprocessing_assembly assembly;
-    FILE *file = fopen("code.swg", "r+");
-    load_code_from_input_file(file, &assembly);
-    for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--trace") == 0) trace = 1; //включена ли трассировка
+    int assemblys = argc - 1;
+    short i = 0;//счетчик индексов тел ассемблера
+
+    for (int j = 1; j < argc; ++j) {
+        if (strcmp(argv[j], "-t") == 0 || strcmp(argv[j], "--trace") == 0){trace = 1;assemblys = assemblys - 1;} //включена ли трассировка и вычетаем от списка
+        else{
+            i++;
+        }
     }
-    if (trace){printf("Hi, this is LETOS compiler, version %s\n", version);}
+
+    Preprocessing_assembly assembly[i];//создаем список ассемблеров
+    i = 0;
+
+    for (int j = 1; j < argc; ++j) {
+        if (strcmp(argv[j], "-t") == 0 || strcmp(argv[j], "--trace") == 0){} //заглушка
+        else{
+            init_assembler(&assembly[i]);
+            load_code_from_input_file(argv[j], &assembly[i]);
+            i++;
+        }
+    }
+
+    if (!assembly[0].file){
+        error("No input files",-1);
+    }
+
+    printf("we have %u assembly\n", assemblys);
+    for (int j = 0; j<i;j++){
+        if(assembly[j].file){
+            printf("file!\n");
+            char text[8];
+            fread(text,1,7, assembly[j].file);
+            text[7] = 0;
+            printf("%s\n",text);
+        }
+        else if(!assembly[j].file){
+            printf("no file!\n");
+        }
+    }
+
+    if (trace){printf("==================Compilation started, version compiler:%s==================\n", version);}
 
     
 }
