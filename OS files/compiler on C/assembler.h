@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <stdio.h>
-
 #define MAX_LINES 200
 
 typedef struct{
@@ -34,7 +33,7 @@ typedef struct
 
 typedef struct
 {
-    Line lines[MAX_LINES]; //максимальное количество строк
+    int count;
     FILE *file; //input file
     Symbol symbols[250]; //колличество меток
     int symbols_count;
@@ -43,3 +42,4 @@ typedef struct
     int macros_count;
 } Preprocessing_assembly;
 
+void init_assembler(Preprocessing_assembly* assembly, int count);
