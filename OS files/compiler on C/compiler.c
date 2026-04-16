@@ -88,21 +88,25 @@ Command commands[] = {
 };
 //================================Функции========================================
 
-void error(char* arg, int y){
-    printf("You have an error:%s in %i line, exit from compile\n", arg, y);
+void error(char* arg, int count, int type){
+    if (type == 0){
+        printf("You have an error:%s in %i line, exit from compile\n", arg, count);
+    } else if (type == 1){
+        printf("You have an error:%s in %i file, exit from compile\n", arg, count);
+    }
     exit(0);
 }
 
-void init_assembler(Preprocessing_assembly* assembly){
+void init_assembler(Preprocessing_assembly* assembly, int count){
     assembly->macros_count = 0;
     assembly->symbols_count = 0;
-    assembly->file = NULL; 
+    assembly->count = count;
 }
 
 static void load_code_from_input_file(char* name_file, Preprocessing_assembly *assembly){
     char magic_bytes[8]; //+1 для нуль терминатора
     FILE *file = fopen(name_file, "r+");
-    if (!file) {error("No such file", -1); exit(1);}
+    if (!file) {error("No such file", -1, 1); exit(1);}
     fread(magic_bytes, 1, 7, file);
     
     if(strcmp(magic_bytes, "@LET 1 ") == 0){ //если magic bytes совпадают
@@ -111,7 +115,7 @@ static void load_code_from_input_file(char* name_file, Preprocessing_assembly *a
         return;
     }
     else{
-        error("Incorrect magic bytes", -1);
+        error("Incorrect magic bytes", assembly->count+1, 1);
     }
 }
 
@@ -123,16 +127,12 @@ void clear_screen() {
     #endif
 }
 
-void parser_stroke(char *stroke){ 
-    for(short i = 0; i<31; i++){
-        if(stroke[i] == ' '){
-            
-        }
-    }
+int parser_words(char** tokens){
+    
 }
 
-int parser_words(char *words){
-    
+char** tokenisation(char* code){
+
 }
 
 int main(int argc, char **argv)
@@ -141,45 +141,45 @@ int main(int argc, char **argv)
     int assemblys = argc - 1;
     short i = 0;//счетчик индексов тел ассемблера
 
+
     for (int j = 1; j < argc; ++j) {
         if (strcmp(argv[j], "-t") == 0 || strcmp(argv[j], "--trace") == 0){trace = 1;assemblys = assemblys - 1;} //включена ли трассировка и вычетаем от списка
         else{
             i++;
         }
     }
-
+    char* assembly_files[i];
     Preprocessing_assembly assembly[i];//создаем список ассемблеров
     i = 0;
 
     for (int j = 1; j < argc; ++j) {
         if (strcmp(argv[j], "-t") == 0 || strcmp(argv[j], "--trace") == 0){} //заглушка
         else{
-            init_assembler(&assembly[i]);
+            init_assembler(&assembly[i], i);
             load_code_from_input_file(argv[j], &assembly[i]);
+            assembly_files[i] = argv[j];
             i++;
         }
     }
 
-    if (!assembly[0].file){
-        error("No input files",-1);
-    }
-
-    printf("we have %u assembly\n", assemblys);
-    for (int j = 0; j<i;j++){
-        if(assembly[j].file){
-            printf("file!\n");
-            char text[8];
-            fread(text,1,7, assembly[j].file);
-            text[7] = 0;
-            printf("%s\n",text);
-        }
-        else if(!assembly[j].file){
-            printf("no file!\n");
-        }
+    if (i == 0){
+        error("No input files",-1,1);
     }
 
     if (trace){printf("==================Compilation started, version compiler:%s==================\n", version);}
-
     
+    if (trace) printf("Work with %u assemblys:\n", assemblys);
+    for (int j = 0; j<i;j++){
+        if(assembly[j].file){
+            if (trace) printf("%i. file:%s, magic bytes:", (j+1), assembly_files[j]);
+            char text[8];
+            fread(text,1,7, assembly[j].file);
+            text[7] = 0;
+            if (trace) printf("%s\n",text);
+        }
+        else if(!assembly[j].file){
+            error("No file...", j, 1);
+        }
+    }
 }
 
